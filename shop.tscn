@@ -3,9 +3,15 @@
 [ext_resource type="Script" uid="uid://eyes75iu63n5" path="res://scripts/furniture_tag.gd" id="1_fgaav"]
 [ext_resource type="Script" uid="uid://c58vonp3gnihr" path="res://scripts/player.gd" id="1_viryw"]
 [ext_resource type="Script" uid="uid://bfw3ptfjv87cs" path="res://scripts/shop_editor.gd" id="2_blqjs"]
+[ext_resource type="Script" uid="uid://bor355jldaop" path="res://scripts/shutter.gd" id="2_sw5c6"]
+[ext_resource type="Script" uid="uid://rame8tohbu7y" path="res://scripts/held_item_view.gd" id="3_8kdgp"]
 [ext_resource type="Script" uid="uid://bym8x8scxij5m" path="res://scripts/layout_grid.gd" id="3_fgaav"]
 [ext_resource type="Script" uid="uid://cwnfys5j0wi7x" path="res://scripts/furniture_hover.gd" id="3_gmb2m"]
+[ext_resource type="Script" uid="uid://d13ta0yagidra" path="res://scripts/interact_tag.gd" id="3_msgp6"]
 [ext_resource type="Script" uid="uid://c1i0cprdypola" path="res://scripts/inventory_panel.gd" id="5_6lah5"]
+[ext_resource type="Script" uid="uid://bujxflawpmxun" path="res://scripts/hud.gd" id="8_myf4l"]
+[ext_resource type="Script" uid="uid://4tbsgnfxd8c5" path="res://scripts/shop_manager.gd" id="11_e23gp"]
+[ext_resource type="Script" uid="uid://bjwphryxftj1q" path="res://scripts/customer_menu.gd" id="11_msgp6"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3inal"]
 
@@ -41,12 +47,18 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_c28k5")
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_avqij"]
+transparency = 1
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_daipm"]
+metallic = 0.61
+
 [node name="Shop" type="Node3D" unique_id=768722951]
 
 [node name="GridMap" type="GridMap" parent="." unique_id=1009199547]
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1735973648]
-transform = Transform3D(1, 0, 0, 0, -0.08956938, 0.9959806, 0, -0.9959806, -0.08956938, 0.3591709, 12.574685, 4.143997)
+transform = Transform3D(0.95306754, 0.027117819, -0.30154082, 0.30275768, -0.08536566, 0.94923675, 0, -0.99598056, -0.08956937, 0.3591709, 12.574685, 4.143997)
 light_energy = 0.366
 light_specular = 5.277
 directional_shadow_max_distance = 10.0
@@ -59,7 +71,27 @@ mesh = SubResource("ArrayMesh_viryw")
 
 [node name="FurnitureTag" type="Node" parent="Level/Shelf" unique_id=1575201324]
 script = ExtResource("1_fgaav")
+display_name = "Shelf"
+footprint = null
+movable = null
+color = null
 inventory_big_cells = Vector2i(2, 3)
+inventory_sub = null
+add_test_items = true
+metadata/_custom_type_script = "uid://eyes75iu63n5"
+
+[node name="Shelf2" type="MeshInstance3D" parent="Level" unique_id=706710431]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 3.5, 0.5, 6)
+mesh = SubResource("ArrayMesh_viryw")
+
+[node name="FurnitureTag" type="Node" parent="Level/Shelf2" unique_id=1564148295]
+script = ExtResource("1_fgaav")
+display_name = "Shelf"
+footprint = null
+movable = null
+color = null
+inventory_big_cells = Vector2i(2, 3)
+inventory_sub = null
 add_test_items = true
 metadata/_custom_type_script = "uid://eyes75iu63n5"
 
@@ -122,12 +154,45 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
 use_collision = true
 size = Vector3(8, 0.1, 8)
 
-[node name="Player" type="Node3D" parent="." unique_id=251664132]
+[node name="Shutter" type="Node3D" parent="Level" unique_id=1474446165]
+script = ExtResource("2_sw5c6")
+
+[node name="CSGBox3D" type="CSGBox3D" parent="Level/Shutter" unique_id=221822933]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 2.25, 0)
+size = Vector3(0.1, 2.5, 4)
+material = SubResource("StandardMaterial3D_avqij")
+
+[node name="Entrance" type="Marker3D" parent="Level" unique_id=1583017801]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -4)
+
+[node name="CounterSpot" type="Marker3D" parent="Level" unique_id=1750717200]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 0)
+
+[node name="LeanSpot" type="Marker3D" parent="Level" unique_id=95235254]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5746821, 0, 0)
+
+[node name="OpenButton" type="Node3D" parent="Level" unique_id=241910899]
+
+[node name="CSGBox3D" type="CSGBox3D" parent="Level/OpenButton" unique_id=888063836]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.85, 2, 2.25)
+size = Vector3(0.15, 0.3, 0.3)
+material = SubResource("StandardMaterial3D_daipm")
+
+[node name="OpenShopTag" type="Node" parent="Level/OpenButton" unique_id=1601551116]
+script = ExtResource("3_msgp6")
+metadata/_custom_type_script = "uid://d13ta0yagidra"
+
+[node name="Player" type="Node3D" parent="." unique_id=251664132 node_paths=PackedStringArray("lean_spot")]
 script = ExtResource("1_viryw")
+lean_spot = NodePath("../Level/LeanSpot")
 
 [node name="Camera3D" type="Camera3D" parent="Player" unique_id=339772555]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 fov = 70.0
+
+[node name="HandAnchor" type="Node3D" parent="Player/Camera3D" unique_id=375569744]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, -0.25, -0.6)
+script = ExtResource("3_8kdgp")
 
 [node name="AAA" type="Sprite3D" parent="." unique_id=1036713833]
 pixel_size = 0.03
@@ -173,3 +238,19 @@ script = ExtResource("5_6lah5")
 [node name="Fade" type="ColorRect" parent="ShopEditor" unique_id=275689151]
 offset_right = 640.0
 offset_bottom = 360.0
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=1448171098]
+script = ExtResource("8_myf4l")
+
+[node name="CustomerMenu" type="CanvasLayer" parent="." unique_id=374994237]
+script = ExtResource("11_msgp6")
+
+[node name="ShopManager" type="Node" parent="." unique_id=1579994613 node_paths=PackedStringArray("shutter", "entrance", "counter_spot", "open_button", "layout_editor")]
+script = ExtResource("11_e23gp")
+shutter = NodePath("../Level/Shutter")
+entrance = NodePath("../Level/Entrance")
+counter_spot = NodePath("../Level/CounterSpot")
+open_button = NodePath("../Level/OpenButton/OpenShopTag")
+layout_editor = NodePath("../ShopEditor")
+customers_per_day = null
+arrival_delay = null

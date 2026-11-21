@@ -34,6 +34,8 @@ func inventory_cells() -> Vector2i:
 	return inventory_big_cells * inventory_sub
 
 func _add_test_items() -> void:
-	stored.append({"name": "Book", "tile": Vector2i(0, 0), "size": Vector2i(1, 2), "color": Color(0.8, 0.4, 0.3)})
-	stored.append({"name": "Crate", "tile": Vector2i(2, 0), "size": Vector2i(2, 2), "color": Color(0.5, 0.7, 0.4)})
-	stored.append({"name": "Sword", "tile": Vector2i(1, 5), "size": Vector2i(1, 4), "color": Color(0.6, 0.6, 0.8)})
+	var placements := [["sword", Vector2i(0, 0)], ["canned_food", Vector2i(2, 0)], ["crate", Vector2i(4, 0)]]
+	for p in placements:
+		var item := ItemDB.make_item(str(p[0]))
+		item["tile"] = p[1]
+		stored.append(item)

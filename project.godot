@@ -17,8 +17,8 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-#Worldmanager-handlesroomlayoutandinteractionsworld_manager="res://scripts/world_manager.gd"
-#Playerscenemain_player="res://scenes/player.tscn"
+GameState="*uid://dskoyfwr4qsdm"
+ItemDB="*uid://bl1rqrva7ilc3"
 
 [display]
 

@@ -1,0 +1,21 @@
+{
+  "tag_price_multipliers": {
+	"damaged": 0.5,
+	"expired": 0.25,
+	"makeshift": 0.8,
+	"high_quality": 1.5
+  },
+  "items": [
+	{ "id": "sword", "name": "Makeshift Sword", "size": [1, 4], "color": "#9aa5c8", "price": 45, "tags": ["weapon", "makeshift"] },
+	{ "id": "knife", "name": "Kitchen Knife", "size": [1, 2], "color": "#b8bcc4", "price": 18, "tags": ["weapon", "tool", "undamaged"] },
+	{ "id": "rusty_knife", "name": "Rusty Knife", "size": [1, 2], "color": "#8a6a4a", "price": 18, "tags": ["weapon", "tool", "damaged"] },
+	{ "id": "canned_food", "name": "Canned Food", "size": [1, 1], "color": "#c98a3d", "price": 6, "tags": ["food", "undamaged", "not_expired"] },
+	{ "id": "old_canned_food", "name": "Expired Can", "size": [1, 1], "color": "#7a6a3a", "price": 6, "tags": ["food", "undamaged", "expired"] },
+	{ "id": "bandage", "name": "Bandage Roll", "size": [1, 1], "color": "#e8e0d0", "price": 12, "tags": ["medical", "undamaged"] },
+	{ "id": "water_bottle", "name": "Water Bottle", "size": [1, 2], "color": "#5aa7d8", "price": 4, "tags": ["drink", "undamaged"] },
+	{ "id": "radio", "name": "Hand Radio", "size": [2, 1], "color": "#4a7a5a", "price": 35, "tags": ["electronics", "undamaged"] },
+	{ "id": "battery", "name": "Battery Pack", "size": [1, 1], "color": "#d8c84a", "price": 9, "tags": ["electronics", "undamaged"] },
+	{ "id": "flashlight", "name": "Flashlight", "size": [1, 2], "color": "#c8b848", "price": 14, "tags": ["tool", "electronics", "undamaged"] },
+	{ "id": "crate", "name": "Supply Crate", "size": [2, 2], "color": "#8a6b3f", "price": 30, "tags": ["container", "undamaged"] }
+  ]
+}

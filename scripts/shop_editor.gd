@@ -20,6 +20,7 @@ var _cam_pos: Vector3
 var _cam_rot: Vector3
 var editing := false
 var transitioning := false
+var locked := false
 
 func _ready() -> void:
 	cam = player.get_node("Camera3D")
@@ -34,8 +35,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	if event.keycode == KEY_M:
-		if inventory_panel.visible:
-			inventory_panel.close()
+		if inventory_panel.has_windows():
+			inventory_panel.close_all()
 			return
 		if transitioning:
 			return
@@ -43,11 +44,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			_close()
 		else:
 			_open()
-	elif event.keycode == KEY_R and editing and not transitioning and not inventory_panel.visible:
+	elif event.keycode == KEY_R and editing and not transitioning and not inventory_panel.has_windows():
 		grid.try_rotate(not event.shift_pressed)
 
 func _open() -> void:
-	if player.busy:
+	if player.busy or locked:
 		return
 	transitioning = true
 	editing = true
