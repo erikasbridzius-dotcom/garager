@@ -247,8 +247,3 @@ func _after_trade() -> void:
 func _on_done() -> void:
 	if _customer != null:
 		_finish(_customer.traded)
-
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_ESCAPE and _customer != null:
-			close_menu()

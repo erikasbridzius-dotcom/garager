@@ -44,7 +44,7 @@ func _process(_delta: float) -> void:
 
 	if leaning:
 		if Input.is_action_just_pressed("move_back"):
-			unlean()
+			_close_menu_and_unlean()
 		return
 
 	if Input.is_action_pressed("move_forward"):
@@ -58,6 +58,13 @@ func _process(_delta: float) -> void:
 		turn(90.0)
 	elif Input.is_action_pressed("turn_right"):
 		turn(-90.0)
+
+func _close_menu_and_unlean() -> void:
+	# Close the customer menu if one is open, then unlean
+	var cm := get_tree().current_scene.find_child("CustomerMenu", true, false) as Node
+	if cm != null and cm.has_method("close_menu"):
+		cm.close_menu()
+	unlean()
 
 # ---------- leaning at the counter ----------
 

@@ -38,6 +38,15 @@ func _process(_delta: float) -> void:
 		hovered = null
 	else:
 		hovered = _pick()
+	# For InteractTags (customer conversations), only show pointer if player is leaning
+	if hovered is InteractTag:
+		var target_node := (hovered as InteractTag).get_parent()
+		# Check if this is a customer (has can_talk property) or a generic InteractTag (like open button)
+		if target_node is Customer:
+			var player_node := player as Node3D
+			var is_leanting: bool = player_node != null and player_node.get("leaning") == true
+			if not is_leanting:
+				hovered = null
 	if hovered != old:
 		Input.set_default_cursor_shape(
 			Input.CURSOR_POINTING_HAND if hovered != null else Input.CURSOR_ARROW)
