@@ -4,7 +4,6 @@ extends Node3D
 signal clicked(customer: Customer)
 signal leaving
 signal finished
-signal conversation_ended  # emitted when customer finishes being dismissed after trade
 
 var data: CustomerData
 var traded := false
@@ -52,21 +51,8 @@ func _on_interacted() -> void:
 	clicked.emit(self)
 
 # Called by the menu when the deal is over
-func dismiss() -> void:
-	_leave(true)  # happy = true when manually dismissed
-
-func finish_conversation() -> void:
-	if _done:
-		return
-	_done = true
-	_tag.enabled = false
-	can_talk = false
-	conversation_ended.emit()
-	var t := create_tween()
-	t.tween_property(self, "global_position", entrance_pos, 2.0)
-	await t.finished
-	finished.emit()
-	queue_free()
+func dismiss(happy: bool) -> void:
+	_leave(happy)
 
 func _leave(_happy: bool) -> void:
 	if _done:
