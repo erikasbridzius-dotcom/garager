@@ -3,7 +3,6 @@ extends CanvasLayer
 
 var inventory_panel: InventoryPanel
 var layout_editor: LayoutEditor
-var player: Node3D
 
 var _customer: Customer = null
 var _panel: PanelContainer
@@ -18,9 +17,8 @@ func _ready() -> void:
 	var root := get_tree().current_scene
 	inventory_panel = root.find_child("InventoryPanel", true, false) as InventoryPanel
 	layout_editor = root.find_child("ShopEditor", true, false) as LayoutEditor
-	player = root.find_child("Player", true, false) as Node3D
-	if inventory_panel == null or layout_editor == null or player == null:
-		push_error("CustomerMenu: could not find InventoryPanel, ShopEditor or Player nodes.")
+	if inventory_panel == null or layout_editor == null:
+		push_error("CustomerMenu: could not find InventoryPanel and ShopEditor nodes.")
 		set_process(false)
 		return
 	_build()
@@ -50,30 +48,18 @@ func close_menu() -> void:
 	_panel.visible = false
 
 func _unhook() -> void:
-	if _customer != null and is_instance_valid(_customer):
-		if _customer.leaving.is_connected(_on_customer_leaving):
-			_customer.leaving.disconnect(_on_customer_leaving)
+	if _customer != null and is_instance_valid(_customer) \
+			and _customer.leaving.is_connected(_on_customer_leaving):
+		_customer.leaving.disconnect(_on_customer_leaving)
 
 func _on_customer_leaving() -> void:
-	# Customer is leaving due to impatience (no trade happened)
 	close_menu()
 
 func _finish(happy: bool) -> void:
-	# Called by "Send away" button - dismisses the customer
 	var c := _customer
 	close_menu()
-	# Unlean the player
-	if player != null and player.get("leaning") == true:
-		player.unlean()
 	if c != null and is_instance_valid(c):
 		c.dismiss(happy)
-
-func _cancel() -> void:
-	# ESC or X button - just closes menu, customer stays (they can be talked to again)
-	close_menu()
-	# Unlean the player
-	if player != null and player.get("leaning") == true:
-		player.unlean()
 
 # ---------- building the UI ----------
 
@@ -108,7 +94,7 @@ func _build() -> void:
 	header.add_child(_title)
 	var close_btn := Button.new()
 	close_btn.text = "X"
-	close_btn.pressed.connect(_cancel)
+	close_btn.pressed.connect(close_menu)
 	header.add_child(close_btn)
 	root_box.add_child(header)
 
@@ -265,4 +251,4 @@ func _on_done() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE and _customer != null:
-			_cancel()
+			close_menu()
