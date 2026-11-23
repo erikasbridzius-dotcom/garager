@@ -38,6 +38,12 @@ func _process(_delta: float) -> void:
 		hovered = null
 	else:
 		hovered = _pick()
+	# For InteractTags (customer conversations), only show pointer if player is leaning
+	if hovered is InteractTag:
+		var player_node := player as Node3D
+		var is_leanting: bool = player_node != null and player_node.get("leaning") == true
+		if not is_leanting:
+			hovered = null
 	if hovered != old:
 		Input.set_default_cursor_shape(
 			Input.CURSOR_POINTING_HAND if hovered != null else Input.CURSOR_ARROW)
@@ -66,7 +72,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			player.busy = true
 			inventory_panel.open(target as FurnitureTag)
 		elif target is InteractTag:
-			(target as InteractTag).interact()
+			# Only interact if the customer is ready to talk (is leaning / can_talk)
+			var it := target as InteractTag
+			var customer := it.get_parent() as Customer
+			if customer != null and customer.can_talk:
+				it.interact()
 		get_viewport().set_input_as_handled()
 
 func _on_all_closed() -> void:

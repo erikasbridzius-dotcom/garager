@@ -3,6 +3,7 @@ extends CanvasLayer
 
 var inventory_panel: InventoryPanel
 var layout_editor: LayoutEditor
+var player: Node3D
 
 var _customer: Customer = null
 var _panel: PanelContainer
@@ -17,8 +18,9 @@ func _ready() -> void:
 	var root := get_tree().current_scene
 	inventory_panel = root.find_child("InventoryPanel", true, false) as InventoryPanel
 	layout_editor = root.find_child("ShopEditor", true, false) as LayoutEditor
-	if inventory_panel == null or layout_editor == null:
-		push_error("CustomerMenu: could not find InventoryPanel and ShopEditor nodes.")
+	player = root.find_child("Player", true, false) as Node3D
+	if inventory_panel == null or layout_editor == null or player == null:
+		push_error("CustomerMenu: could not find InventoryPanel, ShopEditor or Player nodes.")
 		set_process(false)
 		return
 	_build()
@@ -40,6 +42,8 @@ func open(c: Customer) -> void:
 	_customer = c
 	if not c.leaving.is_connected(_on_customer_leaving):
 		c.leaving.connect(_on_customer_leaving)
+	if not c.conversation_ended.is_connected(_on_customer_done):
+		c.conversation_ended.connect(_on_customer_done)
 	_refresh()
 
 func close_menu() -> void:
@@ -48,18 +52,36 @@ func close_menu() -> void:
 	_panel.visible = false
 
 func _unhook() -> void:
-	if _customer != null and is_instance_valid(_customer) \
-			and _customer.leaving.is_connected(_on_customer_leaving):
-		_customer.leaving.disconnect(_on_customer_leaving)
+	if _customer != null and is_instance_valid(_customer):
+		if _customer.leaving.is_connected(_on_customer_leaving):
+			_customer.leaving.disconnect(_on_customer_leaving)
+		if _customer.conversation_ended.is_connected(_on_customer_done):
+			_customer.conversation_ended.disconnect(_on_customer_done)
 
 func _on_customer_leaving() -> void:
+	# Customer is leaving due to impatience (no trade happened)
+	_close_and_unlean()
+
+func _on_customer_done() -> void:
+	# Customer finished being dismissed after a trade
 	close_menu()
 
-func _finish(happy: bool) -> void:
+func _finish() -> void:
+	# Called by "Send away" button - dismisses the customer
 	var c := _customer
-	close_menu()
+	_close_and_unlean()
 	if c != null and is_instance_valid(c):
-		c.dismiss(happy)
+		c.finish_conversation()
+
+func _close_and_unlean() -> void:
+	close_menu()
+	# Unlean the player when the menu is closed
+	if player != null and player.get("leaning") == true:
+		player.unlean()
+
+func _cancel() -> void:
+	# ESC or X button - just closes menu, customer stays
+	_close_and_unlean()
 
 # ---------- building the UI ----------
 
@@ -94,7 +116,7 @@ func _build() -> void:
 	header.add_child(_title)
 	var close_btn := Button.new()
 	close_btn.text = "X"
-	close_btn.pressed.connect(close_menu)
+	close_btn.pressed.connect(_cancel)
 	header.add_child(close_btn)
 	root_box.add_child(header)
 
@@ -240,10 +262,15 @@ func _after_trade() -> void:
 		if e["for_sale"]:
 			still_selling = true
 	if d.wants.is_empty() and not still_selling:
-		_finish(true)  # nothing left to do, so they leave happy
+		_finish()  # customer finishes being dismissed after trade
 	else:
 		_refresh()
 
 func _on_done() -> void:
 	if _customer != null:
-		_finish(_customer.traded)
+		_finish()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE and _customer != null:
+			_cancel()
