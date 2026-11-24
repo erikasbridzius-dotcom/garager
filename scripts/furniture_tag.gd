@@ -7,6 +7,7 @@ extends Node
 @export var inventory_big_cells := Vector2i(0, 0)  # (0, 0) = no inventory. Shelf: (2, 3)
 @export var inventory_sub := 4                      # small cells per big cell, per side
 @export var add_test_items := false                 # tick once to see sample items
+var trader: CustomerData = null  # set on a customer's inventory, so drops become trades
 
 var stored: Array[Dictionary] = []
 

@@ -6,6 +6,7 @@ signal hand_changed(index: int, entry: Dictionary)  # index 0 = left hand, 1 = r
 
 const PAD := 14.0
 const TITLE_H := 34.0
+const HEADER_H := 60.0   # extra space under the title for a customer's name/wants/budget lines
 const HAND_ZONE_H := 90.0
 
 class Win:
@@ -26,8 +27,8 @@ var _drag_win: Win = null
 var _drag_off := Vector2.ZERO
 
 var _held: Dictionary = {}
-var _held_src: FurnitureTag = null   # the furniture it came from (null if it came from a hand)
-var _held_src_hand := -1             # the hand it came from (-1 if it came from furniture)
+var _held_src: FurnitureTag = null   # the container it came from (null if it came from a hand)
+var _held_src_hand := -1             # the hand it came from (-1 if it came from a container)
 var _held_src_tile := Vector2i.ZERO
 var _held_src_size := Vector2i.ONE
 var _held_off := Vector2i.ZERO
@@ -72,7 +73,8 @@ func open(t: FurnitureTag) -> void:
 	var w := Win.new()
 	w.tag = t
 	var cells := t.inventory_cells()
-	var fit_h := (size.y * 0.8 - PAD * 2.0 - TITLE_H) / cells.y
+	var head := HEADER_H if t.trader != null else 0.0
+	var fit_h := (size.y * 0.8 - PAD * 2.0 - TITLE_H - head) / cells.y
 	var fit_w := (size.x * 0.4 - PAD * 2.0) / cells.x
 	w.cp = clampf(floorf(minf(fit_h, fit_w)), 12.0, 36.0)
 	var b := _box(w)
@@ -80,6 +82,24 @@ func open(t: FurnitureTag) -> void:
 	_clamp_pos(w)
 	windows.append(w)
 	queue_redraw()
+
+func open_customer(c: Customer) -> void:
+	open(c.data.container())
+	if not c.leaving.is_connected(_on_customer_leaving):
+		c.leaving.connect(_on_customer_leaving)
+
+func _on_customer_leaving(c: Customer) -> void:
+	for w in windows.duplicate():
+		if w.tag.trader == c.data:
+			if not _held.is_empty() and _held_src == w.tag:
+				_return_held()
+				_held = {}
+			close_window(w)
+
+func close_customers() -> void:
+	for w in windows.duplicate():
+		if w.tag.trader != null:
+			close_window(w)
 
 func close_window(w: Win) -> void:
 	windows.erase(w)
@@ -99,20 +119,27 @@ func close_all() -> void:
 
 # ---------- geometry ----------
 
+func _header_h(w: Win) -> float:
+	return HEADER_H if w.tag.trader != null else 0.0
+
 func _box(w: Win) -> Rect2:
 	var c := w.tag.inventory_cells()
-	return Rect2(w.pos, Vector2(c.x * w.cp + PAD * 2.0, c.y * w.cp + PAD * 2.0 + TITLE_H))
+	return Rect2(w.pos, Vector2(c.x * w.cp + PAD * 2.0, c.y * w.cp + PAD * 2.0 + TITLE_H + _header_h(w)))
 
 func _grid_origin(w: Win) -> Vector2:
-	return w.pos + Vector2(PAD, PAD + TITLE_H)
+	return w.pos + Vector2(PAD, PAD + TITLE_H + _header_h(w))
 
 func _close_rect(w: Win) -> Rect2:
 	var b := _box(w)
 	return Rect2(b.end.x - 28.0, b.position.y + 6.0, 22.0, 22.0)
 
+func _dismiss_rect(w: Win) -> Rect2:
+	var b := _box(w)
+	return Rect2(b.end.x - 28.0 - 88.0, b.position.y + 6.0, 82.0, 22.0)
+
 func _title_rect(w: Win) -> Rect2:
 	var b := _box(w)
-	return Rect2(b.position, Vector2(b.size.x, PAD + TITLE_H))
+	return Rect2(b.position, Vector2(b.size.x, PAD + TITLE_H + _header_h(w)))
 
 func _hand_slot_rect(i: int) -> Rect2:
 	var x := 30.0 if i == 0 else size.x - 30.0 - 90.0
@@ -181,6 +208,44 @@ func _fits(tag: FurnitureTag, tile: Vector2i, isize: Vector2i) -> bool:
 			return false
 	return true
 
+# ---------- trading rules ----------
+
+# Returns "" if putting the held item into dest (null = a hand) is allowed, else the reason why not
+func _trade_check(dest: FurnitureTag) -> String:
+	var src_trader: CustomerData = _held_src.trader if _held_src != null else null
+	var dst_trader: CustomerData = dest.trader if dest != null else null
+	if src_trader == dst_trader:
+		return ""  # no customer involved, or just moving things around in the customer's own bag
+	if src_trader != null and dst_trader != null:
+		return "Finish with one customer first"
+	if src_trader != null:
+		var ask: int = _held.get("ask", 0)
+		if GameState.money < ask:
+			return "Can't afford § %d" % ask
+		return ""
+	return dst_trader.sale_problem(_held)
+
+func _trade_commit(dest: FurnitureTag) -> void:
+	var src_trader: CustomerData = _held_src.trader if _held_src != null else null
+	var dst_trader: CustomerData = dest.trader if dest != null else null
+	if src_trader == dst_trader:
+		return
+	if src_trader != null:
+		var ask: int = _held.get("ask", 0)
+		GameState.spend(ask)
+		src_trader.complete_purchase(_held)
+	elif dst_trader != null:
+		GameState.add_money(dst_trader.receive_sale(_held))
+
+func _say(reason: String, dest: FurnitureTag) -> void:
+	var trd: CustomerData = null
+	if dest != null and dest.trader != null:
+		trd = dest.trader
+	elif _held_src != null and _held_src.trader != null:
+		trd = _held_src.trader
+	if trd != null:
+		trd.note = reason
+
 # ---------- input ----------
 
 func _gui_input(event: InputEvent) -> void:
@@ -224,6 +289,9 @@ func _on_press(p: Vector2) -> void:
 	if _close_rect(w).has_point(p):
 		close_window(w)
 		return
+	if w.tag.trader != null and _dismiss_rect(w).has_point(p):
+		w.tag.trader.dismissed.emit()
+		return
 	if _title_rect(w).has_point(p):
 		_drag_win = w
 		_drag_off = p - w.pos
@@ -234,6 +302,12 @@ func _on_press(p: Vector2) -> void:
 		var idx := _entry_at(w.tag, cell)
 		if idx >= 0:
 			var e: Dictionary = w.tag.stored[idx]
+			if w.tag.trader != null:
+				if not e.get("for_sale", false):
+					w.tag.trader.note = "Not for sale"
+					queue_redraw()
+					return
+				w.tag.trader.note = ""
 			w.tag.stored.remove_at(idx)
 			_held = e
 			_held_src = w.tag
@@ -254,16 +328,26 @@ func _on_release(p: Vector2) -> void:
 		var tile := cell - _held_off
 		var hsize: Vector2i = _held["size"]
 		if _in_grid(w, cell) and _fits(w.tag, tile, hsize):
-			_held["tile"] = tile
-			w.tag.stored.append(_held)
-			placed = true
+			var why := _trade_check(w.tag)
+			if why == "":
+				_trade_commit(w.tag)
+				_held["tile"] = tile
+				w.tag.stored.append(_held)
+				placed = true
+			else:
+				_say(why, w.tag)
 	elif show_hands and _in_hand_zone(p):
 		var th := _target_hand(p)
 		if th >= 0:
-			_held["tile"] = Vector2i.ZERO
-			hands[th] = _held
-			hand_changed.emit(th, hands[th])
-			placed = true
+			var why2 := _trade_check(null)
+			if why2 == "":
+				_trade_commit(null)
+				_held["tile"] = Vector2i.ZERO
+				hands[th] = _held
+				hand_changed.emit(th, hands[th])
+				placed = true
+			else:
+				_say(why2, null)
 	if not placed:
 		_return_held()
 	_held = {}
@@ -307,6 +391,79 @@ func _unhandled_input(event: InputEvent) -> void:
 		_rotate_held(not event.shift_pressed)
 		get_viewport().set_input_as_handled()
 
+var _tip_on := false
+
+func _process(_delta: float) -> void:
+	# keeps the tooltip from sticking when the mouse leaves a window
+	var on := not _hover_entry(get_local_mouse_position()).is_empty()
+	if on or _tip_on:
+		queue_redraw()
+	_tip_on = on
+
+func _hover_entry(p: Vector2) -> Dictionary:
+	if not _held.is_empty() or _drag_win != null:
+		return {}
+	var w := _win_at(p)
+	if w != null:
+		var cell := _cell_in(w, p)
+		if _in_grid(w, cell):
+			var idx := _entry_at(w.tag, cell)
+			if idx >= 0:
+				return w.tag.stored[idx]
+		return {}
+	if show_hands:
+		var hi := _hand_at(p)
+		if hi >= 0:
+			return hands[hi]
+	return {}
+
+func _tooltip_lines(e: Dictionary) -> Array:
+	var grey := Color(0.7, 0.72, 0.8)
+	var gold := Color(1, 0.9, 0.3)
+	var lines: Array = []
+	lines.append([str(e.get("name", "?")), Color.WHITE])
+	var tags: Array = e.get("tags", [])
+	var cat := str(tags[0]).capitalize() if tags.size() > 0 else "Unknown"
+	lines.append(["Type: " + cat, grey])
+	var quality := "Standard"
+	if tags.size() > 1:
+		quality = ", ".join(PackedStringArray(tags.slice(1))).capitalize()
+	lines.append(["Quality: " + quality, grey])
+	var s: Vector2i = e.get("size", Vector2i.ONE)
+	lines.append(["Size: %d x %d" % [s.x, s.y], grey])
+	if e.has("bought"):
+		lines.append(["Purchased for: § %d" % int(e["bought"]), grey])
+	else:
+		lines.append(["Purchased for: —", grey])
+	if e.get("for_sale", false):
+		lines.append(["Asking: § %d" % int(e.get("ask", 0)), gold])
+	lines.append(["Est. value: § %d" % ItemDB.value_of(e), gold])
+	return lines
+
+func _draw_tooltip(font: Font) -> void:
+	var p := get_local_mouse_position()
+	var e := _hover_entry(p)
+	if e.is_empty():
+		return
+	var lines := _tooltip_lines(e)
+	var fs := 13
+	var lh := 18.0
+	var w := 0.0
+	for l in lines:
+		w = maxf(w, font.get_string_size(l[0], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x)
+	w += 20.0
+	var h := lines.size() * lh + 12.0
+	var x := p.x - w - 16.0
+	if x < 4.0:
+		x = p.x + 20.0
+	var y := clampf(p.y - h / 2.0, 4.0, maxf(4.0, size.y - h - 4.0))
+	var r := Rect2(x, y, w, h)
+	draw_rect(r, Color(0.06, 0.06, 0.09, 0.95))
+	draw_rect(r, Color(0.5, 0.5, 0.62), false, 1.5)
+	for i in lines.size():
+		draw_string(font, Vector2(x + 10.0, y + 6.0 + i * lh + 13.0), lines[i][0],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, fs + (2 if i == 0 else 0), lines[i][1])
+
 # ---------- drawing ----------
 
 func _draw() -> void:
@@ -317,6 +474,9 @@ func _draw() -> void:
 		_draw_window(w, font)
 	if not _held.is_empty():
 		_draw_held(font)
+	if not _held.is_empty():
+		_draw_held(font)
+	_draw_tooltip(font)
 
 func _draw_hands(font: Font) -> void:
 	var holding := not _held.is_empty()
@@ -332,6 +492,8 @@ func _draw_hands(font: Font) -> void:
 			target = _target_hand(mp)
 		draw_rect(Rect2(0, size.y - HAND_ZONE_H, size.x, HAND_ZONE_H), band)
 		var label := "Drop to hold" if any_free else "Hands full"
+		if any_free and _held_src != null and _held_src.trader != null:
+			label = "Buy for § %d" % int(_held.get("ask", 0))
 		draw_string(font, Vector2(0, size.y - HAND_ZONE_H + 18.0), label,
 			HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, Color(1, 1, 1, 0.85))
 	for i in 2:
@@ -371,6 +533,19 @@ func _draw_window(w: Win, font: Font) -> void:
 	draw_rect(cr, Color(0.35, 0.15, 0.15))
 	draw_string(font, cr.position + Vector2(6, 17), "X", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
 
+	var trd: CustomerData = w.tag.trader
+	if trd != null:
+		var dr := _dismiss_rect(w)
+		draw_rect(dr, Color(0.3, 0.2, 0.12))
+		draw_string(font, dr.position + Vector2(0, 16), "Send away",
+			HORIZONTAL_ALIGNMENT_CENTER, dr.size.x, 13, Color.WHITE)
+		var lines := trd.header_lines()
+		var colors: Array[Color] = [Color.WHITE, Color(0.95, 0.85, 0.35), Color(1.0, 0.65, 0.45)]
+		var y0 := box.position.y + PAD * 0.5 + TITLE_H + 2.0
+		for i in lines.size():
+			draw_string(font, Vector2(box.position.x + PAD, y0 + i * 20.0 + 15.0), lines[i],
+				HORIZONTAL_ALIGNMENT_LEFT, box.size.x - PAD * 2.0, 15, colors[i])
+
 	for bx in big.x:
 		for by in big.y:
 			var shade := Color(0.15, 0.15, 0.19) if (bx + by) % 2 == 0 else Color(0.18, 0.18, 0.23)
@@ -387,7 +562,15 @@ func _draw_window(w: Win, font: Font) -> void:
 		var s: Vector2i = e.get("size", Vector2i.ONE)
 		var col: Color = e.get("color", Color.WHITE)
 		var nm: String = e.get("name", "?")
-		_draw_item(font, gp + Vector2(t) * w.cp, w.cp, s, col, nm, 1.0)
+		var ipos := gp + Vector2(t) * w.cp
+		_draw_item(font, ipos, w.cp, s, col, nm, 1.0)
+		if trd != null:
+			var r := Rect2(ipos, Vector2(s) * w.cp).grow(-2.0)
+			if e.get("for_sale", false):
+				draw_string(font, Vector2(r.position.x + 3.0, r.end.y - 3.0), "§%d" % int(e.get("ask", 0)),
+					HORIZONTAL_ALIGNMENT_LEFT, maxf(r.size.x - 4.0, 1.0), 12, Color(1, 0.9, 0.3))
+			else:
+				draw_rect(r, Color(0, 0, 0, 0.5))
 
 func _draw_held(font: Font) -> void:
 	var p := get_local_mouse_position()
@@ -399,7 +582,8 @@ func _draw_held(font: Font) -> void:
 		var cell := _cell_in(w, p)
 		if _in_grid(w, cell):
 			var tile := cell - _held_off
-			var tint: Color = col if _fits(w.tag, tile, hsize) else Color(0.9, 0.2, 0.2)
+			var ok := _fits(w.tag, tile, hsize) and _trade_check(w.tag) == ""
+			var tint: Color = col if ok else Color(0.9, 0.2, 0.2)
 			_draw_item(font, _grid_origin(w) + Vector2(tile) * w.cp, w.cp, hsize, tint, nm, 0.8)
 			return
 	var cp := 28.0
