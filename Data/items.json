@@ -14,7 +14,9 @@
 	{ "id": "bandage", "name": "Bandage Roll", "size": [1, 1], "color": "#e8e0d0", "price": 12, "tags": ["medical", "undamaged"] },
 	{ "id": "water_bottle", "name": "Water Bottle", "size": [1, 2], "color": "#5aa7d8", "price": 4, "tags": ["drink", "undamaged"] },
 	{ "id": "radio", "name": "Hand Radio", "size": [2, 1], "color": "#4a7a5a", "price": 35, "tags": ["electronics", "undamaged"] },
-	{ "id": "battery", "name": "Battery Pack", "size": [1, 1], "color": "#d8c84a", "price": 9, "tags": ["electronics", "undamaged"] },
+	{ "id": "battery", "name": "Battery Pack", "size": [1, 1], "color": "#d8c84a", "price": 9, "tags": ["electronics", "undamaged"], "charge": 100 },
+	{ "id": "filament", "name": "Filament Spool", "size": [2, 2], "color": "#4aa8c8", "price": 15, "tags": ["material", "undamaged"] },
+	{ "id": "plastic_toy", "name": "Plastic Toy", "size": [1, 1], "color": "#d84a8a", "price": 10, "tags": ["toy", "undamaged"] },
 	{ "id": "flashlight", "name": "Flashlight", "size": [1, 2], "color": "#c8b848", "price": 14, "tags": ["tool", "electronics", "undamaged"] },
 	{ "id": "crate", "name": "Supply Crate", "size": [2, 2], "color": "#8a6b3f", "price": 30, "tags": ["container", "undamaged"] }
   ]

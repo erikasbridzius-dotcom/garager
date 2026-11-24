@@ -22,14 +22,14 @@ func _ready() -> void:
 # A fresh item, ready to put into an inventory or a hand
 func make_item(id: String) -> Dictionary:
 	if not defs.has(id):
-		push_error("ItemDB: cannot open %s (looked in %s)" % [PATH, ProjectSettings.globalize_path(PATH)])
+		push_error("ItemDB: unknown item id '%s'" % id)
 		return {}
 	var d: Dictionary = defs[id]
 	var sz: Array = d.get("size", [1, 1])
 	var tags: Array = []
 	for t in d.get("tags", []):
 		tags.append(str(t))
-	return {
+	var item := {
 		"id": id,
 		"name": str(d.get("name", id)),
 		"size": Vector2i(int(sz[0]), int(sz[1])),
@@ -38,6 +38,9 @@ func make_item(id: String) -> Dictionary:
 		"price": int(d.get("price", 0)),
 		"tile": Vector2i.ZERO,
 	}
+	if d.has("charge"):
+		item["charge"] = int(d["charge"])
+	return item
 
 func has_all_tags(entry: Dictionary, wanted: Array) -> bool:
 	var tags: Array = entry.get("tags", [])

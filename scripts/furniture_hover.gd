@@ -73,7 +73,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if target is FurnitureTag:
 			_locked = true
 			player.busy = true
-			inventory_panel.open(target as FurnitureTag)
+			inventory_panel.open_furniture(target as FurnitureTag)
 		elif target is InteractTag:
 			(target as InteractTag).interact()
 		get_viewport().set_input_as_handled()
@@ -107,7 +107,7 @@ func _pick() -> Node:
 	var best_d := INF
 	for node in get_tree().get_nodes_in_group("furniture_tag"):
 		var tag := node as FurnitureTag
-		if tag.inventory_big_cells.x <= 0 or tag.inventory_big_cells.y <= 0:
+		if not tag.is_openable():
 			continue
 		var d := _ray_dist(tag.get_parent() as Node3D, from, dir)
 		if d >= 0.0 and d < best_d and d <= interact_distance:

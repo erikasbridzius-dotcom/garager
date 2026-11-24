@@ -6,7 +6,8 @@ signal hand_changed(index: int, entry: Dictionary)  # index 0 = left hand, 1 = r
 
 const PAD := 14.0
 const TITLE_H := 34.0
-const HEADER_H := 60.0   # extra space under the title for a customer's name/wants/budget lines
+const HEADER_H := 60.0   # extra space under the title for header lines (customers, machines)
+const MIN_W := 110.0
 const HAND_ZONE_H := 90.0
 
 class Win:
@@ -32,6 +33,10 @@ var _held_src_hand := -1             # the hand it came from (-1 if it came from
 var _held_src_tile := Vector2i.ZERO
 var _held_src_size := Vector2i.ONE
 var _held_off := Vector2i.ZERO
+
+var _tip_on := false
+var _toast := ""
+var _toast_t := 0.0
 
 # ---------- public API ----------
 
@@ -64,6 +69,13 @@ func blocks_point(p: Vector2) -> bool:
 func _has_point(point: Vector2) -> bool:
 	return blocks_point(point)
 
+# What the player clicked on in the world: machines open several windows, shelves open one
+func open_furniture(t: FurnitureTag) -> void:
+	if t is MachineTag:
+		open_machine(t as MachineTag)
+	else:
+		open(t)
+
 func open(t: FurnitureTag) -> void:
 	for existing in windows:
 		if existing.tag == t:
@@ -73,7 +85,7 @@ func open(t: FurnitureTag) -> void:
 	var w := Win.new()
 	w.tag = t
 	var cells := t.inventory_cells()
-	var head := HEADER_H if t.trader != null else 0.0
+	var head := HEADER_H if t.has_header() else 0.0
 	var fit_h := (size.y * 0.8 - PAD * 2.0 - TITLE_H - head) / cells.y
 	var fit_w := (size.x * 0.4 - PAD * 2.0) / cells.x
 	w.cp = clampf(floorf(minf(fit_h, fit_w)), 12.0, 36.0)
@@ -81,6 +93,35 @@ func open(t: FurnitureTag) -> void:
 	w.pos = (size - b.size) / 2.0 + Vector2(30, 30) * windows.size()
 	_clamp_pos(w)
 	windows.append(w)
+	queue_redraw()
+
+func open_machine(m: MachineTag) -> void:
+	for ex in windows:
+		if ex.tag.machine == m:
+			for w2 in windows.duplicate():
+				if w2.tag.machine == m:
+					_bring_to_front(w2)
+			queue_redraw()
+			return
+	var cp := clampf(floorf(size.y / 27.0), 10.0, 24.0)
+	var gap := 8.0
+	var x := gap
+	var y := gap
+	var row_h := 0.0
+	for s in m.sections:
+		var w := Win.new()
+		w.tag = s
+		w.cp = cp * (2.0 if s.inventory_cells().x <= 2 else 1.0)
+		var b := _box(w)
+		if x + b.size.x > size.x - gap and x > gap:
+			x = gap
+			y += row_h + gap
+			row_h = 0.0
+		w.pos = Vector2(x, y)
+		x += b.size.x + gap
+		row_h = maxf(row_h, b.size.y)
+		_clamp_pos(w)
+		windows.append(w)
 	queue_redraw()
 
 func open_customer(c: Customer) -> void:
@@ -102,7 +143,12 @@ func close_customers() -> void:
 			close_window(w)
 
 func close_window(w: Win) -> void:
+	var m := w.tag.machine
 	windows.erase(w)
+	if m != null:
+		for o in windows.duplicate():
+			if o.tag.machine == m:
+				windows.erase(o)
 	if windows.is_empty():
 		all_closed.emit()
 	queue_redraw()
@@ -120,11 +166,12 @@ func close_all() -> void:
 # ---------- geometry ----------
 
 func _header_h(w: Win) -> float:
-	return HEADER_H if w.tag.trader != null else 0.0
+	return HEADER_H if w.tag.has_header() else 0.0
 
 func _box(w: Win) -> Rect2:
 	var c := w.tag.inventory_cells()
-	return Rect2(w.pos, Vector2(c.x * w.cp + PAD * 2.0, c.y * w.cp + PAD * 2.0 + TITLE_H + _header_h(w)))
+	var width := maxf(c.x * w.cp + PAD * 2.0, MIN_W)
+	return Rect2(w.pos, Vector2(width, c.y * w.cp + PAD * 2.0 + TITLE_H + _header_h(w)))
 
 func _grid_origin(w: Win) -> Vector2:
 	return w.pos + Vector2(PAD, PAD + TITLE_H + _header_h(w))
@@ -208,10 +255,14 @@ func _fits(tag: FurnitureTag, tile: Vector2i, isize: Vector2i) -> bool:
 			return false
 	return true
 
-# ---------- trading rules ----------
+# ---------- trading and machine rules ----------
 
 # Returns "" if putting the held item into dest (null = a hand) is allowed, else the reason why not
 func _trade_check(dest: FurnitureTag) -> String:
+	if dest != null and dest.machine != null:
+		var why := dest.machine.accepts(dest.slot, _held)
+		if why != "":
+			return why
 	var src_trader: CustomerData = _held_src.trader if _held_src != null else null
 	var dst_trader: CustomerData = dest.trader if dest != null else null
 	if src_trader == dst_trader:
@@ -245,8 +296,25 @@ func _say(reason: String, dest: FurnitureTag) -> void:
 		trd = _held_src.trader
 	if trd != null:
 		trd.note = reason
+	else:
+		_flash(reason)
+
+func _flash(text: String) -> void:
+	_toast = text
+	_toast_t = 2.0
+	queue_redraw()
 
 # ---------- input ----------
+
+func _process(delta: float) -> void:
+	if _toast_t > 0.0:
+		_toast_t -= delta
+		queue_redraw()
+	# keeps the tooltip from sticking when the mouse leaves a window
+	var on := not _hover_entry(get_local_mouse_position()).is_empty()
+	if on or _tip_on:
+		queue_redraw()
+	_tip_on = on
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -265,8 +333,7 @@ func _gui_input(event: InputEvent) -> void:
 		if _drag_win != null:
 			_drag_win.pos = mm.position - _drag_off
 			_clamp_pos(_drag_win)
-		if _drag_win != null or not _held.is_empty():
-			queue_redraw()
+		queue_redraw()
 
 func _on_press(p: Vector2) -> void:
 	var w := _win_at(p)
@@ -391,14 +458,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_rotate_held(not event.shift_pressed)
 		get_viewport().set_input_as_handled()
 
-var _tip_on := false
-
-func _process(_delta: float) -> void:
-	# keeps the tooltip from sticking when the mouse leaves a window
-	var on := not _hover_entry(get_local_mouse_position()).is_empty()
-	if on or _tip_on:
-		queue_redraw()
-	_tip_on = on
+# ---------- hover tooltip ----------
 
 func _hover_entry(p: Vector2) -> Dictionary:
 	if not _held.is_empty() or _drag_win != null:
@@ -431,6 +491,8 @@ func _tooltip_lines(e: Dictionary) -> Array:
 	lines.append(["Quality: " + quality, grey])
 	var s: Vector2i = e.get("size", Vector2i.ONE)
 	lines.append(["Size: %d x %d" % [s.x, s.y], grey])
+	if e.has("charge"):
+		lines.append(["Charge: %d%%" % int(e["charge"]), grey])
 	if e.has("bought"):
 		lines.append(["Purchased for: § %d" % int(e["bought"]), grey])
 	else:
@@ -464,6 +526,14 @@ func _draw_tooltip(font: Font) -> void:
 		draw_string(font, Vector2(x + 10.0, y + 6.0 + i * lh + 13.0), lines[i][0],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, fs + (2 if i == 0 else 0), lines[i][1])
 
+func _draw_toast(font: Font) -> void:
+	var fs := 15
+	var w := font.get_string_size(_toast, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 24.0
+	var r := Rect2((size.x - w) / 2.0, size.y - HAND_ZONE_H - 40.0, w, 28.0)
+	draw_rect(r, Color(0.35, 0.1, 0.1, 0.95))
+	draw_rect(r, Color(0.9, 0.4, 0.4), false, 1.5)
+	draw_string(font, r.position + Vector2(12.0, 19.0), _toast, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+
 # ---------- drawing ----------
 
 func _draw() -> void:
@@ -474,9 +544,9 @@ func _draw() -> void:
 		_draw_window(w, font)
 	if not _held.is_empty():
 		_draw_held(font)
-	if not _held.is_empty():
-		_draw_held(font)
 	_draw_tooltip(font)
+	if _toast_t > 0.0:
+		_draw_toast(font)
 
 func _draw_hands(font: Font) -> void:
 	var holding := not _held.is_empty()
@@ -527,7 +597,7 @@ func _draw_window(w: Win, font: Font) -> void:
 	draw_rect(Rect2(box.position, Vector2(box.size.x, PAD * 0.5 + TITLE_H)), Color(0.17, 0.17, 0.22))
 	draw_rect(box, Color(0.4, 0.4, 0.5), false, 2.0)
 	draw_string(font, box.position + Vector2(PAD, PAD + 14.0), w.tag.get_display_name(),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
+		HORIZONTAL_ALIGNMENT_LEFT, box.size.x - PAD - 40.0, 20, Color.WHITE)
 
 	var cr := _close_rect(w)
 	draw_rect(cr, Color(0.35, 0.15, 0.15))
@@ -539,11 +609,12 @@ func _draw_window(w: Win, font: Font) -> void:
 		draw_rect(dr, Color(0.3, 0.2, 0.12))
 		draw_string(font, dr.position + Vector2(0, 16), "Send away",
 			HORIZONTAL_ALIGNMENT_CENTER, dr.size.x, 13, Color.WHITE)
-		var lines := trd.header_lines()
+	if w.tag.has_header():
+		var lines := w.tag.header_lines()
 		var colors: Array[Color] = [Color.WHITE, Color(0.95, 0.85, 0.35), Color(1.0, 0.65, 0.45)]
 		var y0 := box.position.y + PAD * 0.5 + TITLE_H + 2.0
-		for i in lines.size():
-			draw_string(font, Vector2(box.position.x + PAD, y0 + i * 20.0 + 15.0), lines[i],
+		for i in mini(lines.size(), 3):
+			draw_string(font, Vector2(box.position.x + PAD, y0 + i * 20.0 + 15.0), str(lines[i]),
 				HORIZONTAL_ALIGNMENT_LEFT, box.size.x - PAD * 2.0, 15, colors[i])
 
 	for bx in big.x:

@@ -1,8 +1,10 @@
 [gd_scene format=4 uid="uid://csweykvf8vx8b"]
 
+[ext_resource type="PackedScene" uid="uid://cvvdoqwncnequ" path="res://Printer.fbx" id="1_e23gp"]
 [ext_resource type="Script" uid="uid://eyes75iu63n5" path="res://scripts/furniture_tag.gd" id="1_fgaav"]
 [ext_resource type="Script" uid="uid://c58vonp3gnihr" path="res://scripts/player.gd" id="1_viryw"]
 [ext_resource type="Script" uid="uid://bfw3ptfjv87cs" path="res://scripts/shop_editor.gd" id="2_blqjs"]
+[ext_resource type="Script" uid="uid://bjklfqhnklf1d" path="res://scripts/printer_tag.gd" id="2_rrolr"]
 [ext_resource type="Script" uid="uid://bor355jldaop" path="res://scripts/shutter.gd" id="2_sw5c6"]
 [ext_resource type="Script" uid="uid://rame8tohbu7y" path="res://scripts/held_item_view.gd" id="3_8kdgp"]
 [ext_resource type="Script" uid="uid://bym8x8scxij5m" path="res://scripts/layout_grid.gd" id="3_fgaav"]
@@ -65,6 +67,14 @@ directional_shadow_max_distance = 10.0
 
 [node name="Level" type="Node3D" parent="." unique_id=1087345079]
 
+[node name="Printer" parent="Level" unique_id=1862603119 instance=ExtResource("1_e23gp")]
+transform = Transform3D(0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04, 3.45, 0, 9.5)
+
+[node name="PrinterTag" type="Node" parent="Level/Printer" unique_id=708866101]
+script = ExtResource("2_rrolr")
+footprint = Vector2i(1, 1)
+metadata/_custom_type_script = "uid://bjklfqhnklf1d"
+
 [node name="Shelf" type="MeshInstance3D" parent="Level" unique_id=1916115212]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 3.5, 0.5, 8)
 mesh = SubResource("ArrayMesh_viryw")
@@ -72,11 +82,7 @@ mesh = SubResource("ArrayMesh_viryw")
 [node name="FurnitureTag" type="Node" parent="Level/Shelf" unique_id=1575201324]
 script = ExtResource("1_fgaav")
 display_name = "Shelf"
-footprint = null
-movable = null
-color = null
 inventory_big_cells = Vector2i(2, 3)
-inventory_sub = null
 add_test_items = true
 metadata/_custom_type_script = "uid://eyes75iu63n5"
 
@@ -87,11 +93,7 @@ mesh = SubResource("ArrayMesh_viryw")
 [node name="FurnitureTag" type="Node" parent="Level/Shelf2" unique_id=1564148295]
 script = ExtResource("1_fgaav")
 display_name = "Shelf"
-footprint = null
-movable = null
-color = null
 inventory_big_cells = Vector2i(2, 3)
-inventory_sub = null
 add_test_items = true
 metadata/_custom_type_script = "uid://eyes75iu63n5"
 
