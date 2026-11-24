@@ -73,6 +73,7 @@ transform = Transform3D(0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04, 3.45, 0, 9.5)
 [node name="PrinterTag" type="Node" parent="Level/Printer" unique_id=708866101]
 script = ExtResource("2_rrolr")
 footprint = Vector2i(1, 1)
+color = Color(0.91284215, 0.6228598, 3.85046e-07, 1)
 metadata/_custom_type_script = "uid://bjklfqhnklf1d"
 
 [node name="Shelf" type="MeshInstance3D" parent="Level" unique_id=1916115212]
