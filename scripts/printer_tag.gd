@@ -13,10 +13,9 @@ var _waiting: Dictionary = {}     # a finished print waiting for room in the out
 
 func _build_sections() -> void:
 	_add_section("input", "Input", Vector2i(3, 2), 4)
-	var out := _add_section("output", "Output", Vector2i(3, 2), 4)
-	out.header_provider = _status_lines
-	_add_section("battery", "Battery", Vector2i(1, 1), 2)
+	_add_section("output", "Output", Vector2i(3, 2), 4)
 	_add_section("upgrades", "Upgrades", Vector2i(2, 2), 4)
+	_add_section("battery", "Battery", Vector2i(1, 1), 2)
 
 func accepts(slot_name: String, item: Dictionary) -> String:
 	match slot_name:
@@ -87,7 +86,7 @@ func _start_job() -> bool:
 				return true
 	return false
 
-func _status_lines() -> Array:
+func status_lines() -> Array:
 	var l1 := "Idle"
 	if not job.is_empty():
 		var r: Dictionary = RECIPES[int(job["recipe"])]

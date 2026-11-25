@@ -7,13 +7,24 @@ signal hand_changed(index: int, entry: Dictionary)  # index 0 = left hand, 1 = r
 const PAD := 14.0
 const TITLE_H := 34.0
 const HEADER_H := 60.0   # extra space under the title for header lines (customers, machines)
+const LABEL_H := 18.0    # section label above each part of a machine window
+const PART_GAP := 12.0
 const MIN_W := 110.0
 const HAND_ZONE_H := 90.0
 
-class Win:
+# One grid inside a window. A shelf or customer window has one; a machine window has several.
+class Part:
 	var tag: FurnitureTag
+	var off := Vector2.ZERO   # top-left of this grid, relative to the window's grid origin
+	var cp := 28.0            # pixels per small cell
+
+class Win:
+	var tag: FurnitureTag = null     # shelf / customer window: its container (null for machines)
+	var machine: MachineTag = null   # machine window: the machine
+	var title := ""
 	var pos := Vector2.ZERO
-	var cp := 28.0
+	var content := Vector2.ZERO      # size of the grid area
+	var parts: Array[Part] = []
 
 var windows: Array[Win] = []
 var hands: Array[Dictionary] = [{}, {}]
@@ -69,7 +80,7 @@ func blocks_point(p: Vector2) -> bool:
 func _has_point(point: Vector2) -> bool:
 	return blocks_point(point)
 
-# What the player clicked on in the world: machines open several windows, shelves open one
+# What the player clicked on in the world: machines open one big window, shelves a simple one
 func open_furniture(t: FurnitureTag) -> void:
 	if t is MachineTag:
 		open_machine(t as MachineTag)
@@ -84,11 +95,16 @@ func open(t: FurnitureTag) -> void:
 			return
 	var w := Win.new()
 	w.tag = t
+	w.title = t.get_display_name()
+	var part := Part.new()
+	part.tag = t
 	var cells := t.inventory_cells()
 	var head := HEADER_H if t.has_header() else 0.0
 	var fit_h := (size.y * 0.8 - PAD * 2.0 - TITLE_H - head) / cells.y
 	var fit_w := (size.x * 0.4 - PAD * 2.0) / cells.x
-	w.cp = clampf(floorf(minf(fit_h, fit_w)), 12.0, 36.0)
+	part.cp = clampf(floorf(minf(fit_h, fit_w)), 12.0, 36.0)
+	w.parts.append(part)
+	w.content = Vector2(cells) * part.cp
 	var b := _box(w)
 	w.pos = (size - b.size) / 2.0 + Vector2(30, 30) * windows.size()
 	_clamp_pos(w)
@@ -97,32 +113,54 @@ func open(t: FurnitureTag) -> void:
 
 func open_machine(m: MachineTag) -> void:
 	for ex in windows:
-		if ex.tag.machine == m:
-			for w2 in windows.duplicate():
-				if w2.tag.machine == m:
-					_bring_to_front(w2)
+		if ex.machine == m:
+			_bring_to_front(ex)
 			queue_redraw()
 			return
-	var cp := clampf(floorf(size.y / 27.0), 10.0, 24.0)
-	var gap := 8.0
-	var x := gap
-	var y := gap
-	var row_h := 0.0
+	var w := Win.new()
+	w.machine = m
+	w.title = m.get_display_name()
 	for s in m.sections:
-		var w := Win.new()
-		w.tag = s
-		w.cp = cp * (2.0 if s.inventory_cells().x <= 2 else 1.0)
+		var part := Part.new()
+		part.tag = s
+		w.parts.append(part)
+	# use the biggest cell size that still fits the screen
+	var cp := 22.0
+	while cp > 8.0:
+		_layout_machine(w, cp)
 		var b := _box(w)
-		if x + b.size.x > size.x - gap and x > gap:
-			x = gap
-			y += row_h + gap
-			row_h = 0.0
-		w.pos = Vector2(x, y)
-		x += b.size.x + gap
-		row_h = maxf(row_h, b.size.y)
-		_clamp_pos(w)
-		windows.append(w)
+		if b.size.x <= size.x - 16.0 and b.size.y <= size.y - 16.0:
+			break
+		cp -= 1.0
+	w.pos = (size - _box(w).size) / 2.0 + Vector2(30, 30) * windows.size()
+	_clamp_pos(w)
+	windows.append(w)
 	queue_redraw()
+
+# Arranges a machine's sections in rows (sections with the same layout_row sit side by side)
+func _layout_machine(w: Win, cp: float) -> void:
+	var row_ids: Array[int] = []
+	for part in w.parts:
+		if not row_ids.has(part.tag.layout_row):
+			row_ids.append(part.tag.layout_row)
+	row_ids.sort()
+	var y := 0.0
+	var max_w := 0.0
+	for r in row_ids:
+		var x := 0.0
+		var row_h := 0.0
+		for part in w.parts:
+			if part.tag.layout_row != r:
+				continue
+			var cells := part.tag.inventory_cells()
+			part.cp = cp * (2.0 if cells.x <= 2 else 1.0)  # tiny sections (a battery slot) get bigger cells
+			part.off = Vector2(x, y + LABEL_H)
+			var sz := Vector2(cells) * part.cp
+			x += sz.x + PART_GAP
+			row_h = maxf(row_h, sz.y + LABEL_H)
+		max_w = maxf(max_w, x - PART_GAP)
+		y += row_h + PART_GAP
+	w.content = Vector2(max_w, y - PART_GAP)
 
 func open_customer(c: Customer) -> void:
 	open(c.data.container())
@@ -131,7 +169,7 @@ func open_customer(c: Customer) -> void:
 
 func _on_customer_leaving(c: Customer) -> void:
 	for w in windows.duplicate():
-		if w.tag.trader == c.data:
+		if w.tag != null and w.tag.trader == c.data:
 			if not _held.is_empty() and _held_src == w.tag:
 				_return_held()
 				_held = {}
@@ -139,16 +177,11 @@ func _on_customer_leaving(c: Customer) -> void:
 
 func close_customers() -> void:
 	for w in windows.duplicate():
-		if w.tag.trader != null:
+		if _trader(w) != null:
 			close_window(w)
 
 func close_window(w: Win) -> void:
-	var m := w.tag.machine
 	windows.erase(w)
-	if m != null:
-		for o in windows.duplicate():
-			if o.tag.machine == m:
-				windows.erase(o)
 	if windows.is_empty():
 		all_closed.emit()
 	queue_redraw()
@@ -165,16 +198,35 @@ func close_all() -> void:
 
 # ---------- geometry ----------
 
+func _trader(w: Win) -> CustomerData:
+	if w.tag != null:
+		return w.tag.trader
+	return null
+
+func _has_header(w: Win) -> bool:
+	if w.machine != null:
+		return true
+	return w.tag != null and w.tag.has_header()
+
+func _header_lines(w: Win) -> Array:
+	if w.machine != null:
+		return w.machine.status_lines()
+	if w.tag != null:
+		return w.tag.header_lines()
+	return []
+
 func _header_h(w: Win) -> float:
-	return HEADER_H if w.tag.has_header() else 0.0
+	return HEADER_H if _has_header(w) else 0.0
 
 func _box(w: Win) -> Rect2:
-	var c := w.tag.inventory_cells()
-	var width := maxf(c.x * w.cp + PAD * 2.0, MIN_W)
-	return Rect2(w.pos, Vector2(width, c.y * w.cp + PAD * 2.0 + TITLE_H + _header_h(w)))
+	var width := maxf(w.content.x + PAD * 2.0, MIN_W)
+	return Rect2(w.pos, Vector2(width, w.content.y + PAD * 2.0 + TITLE_H + _header_h(w)))
 
 func _grid_origin(w: Win) -> Vector2:
 	return w.pos + Vector2(PAD, PAD + TITLE_H + _header_h(w))
+
+func _part_origin(w: Win, part: Part) -> Vector2:
+	return _grid_origin(w) + part.off
 
 func _close_rect(w: Win) -> Rect2:
 	var b := _box(w)
@@ -222,16 +274,24 @@ func _win_at(p: Vector2) -> Win:
 			return windows[i]
 	return null
 
+# Which grid of the window is under p (null if none)
+func _part_at(w: Win, p: Vector2) -> Part:
+	for part in w.parts:
+		var r := Rect2(_part_origin(w, part), Vector2(part.tag.inventory_cells()) * part.cp)
+		if r.has_point(p):
+			return part
+	return null
+
 func _bring_to_front(w: Win) -> void:
 	windows.erase(w)
 	windows.append(w)
 
-func _cell_in(w: Win, p: Vector2) -> Vector2i:
-	var q := (p - _grid_origin(w)) / w.cp
+func _cell_in(w: Win, part: Part, p: Vector2) -> Vector2i:
+	var q := (p - _part_origin(w, part)) / part.cp
 	return Vector2i(floori(q.x), floori(q.y))
 
-func _in_grid(w: Win, cell: Vector2i) -> bool:
-	var c := w.tag.inventory_cells()
+func _in_grid(part: Part, cell: Vector2i) -> bool:
+	var c := part.tag.inventory_cells()
 	return cell.x >= 0 and cell.y >= 0 and cell.x < c.x and cell.y < c.y
 
 func _entry_at(tag: FurnitureTag, cell: Vector2i) -> int:
@@ -356,28 +416,30 @@ func _on_press(p: Vector2) -> void:
 	if _close_rect(w).has_point(p):
 		close_window(w)
 		return
-	if w.tag.trader != null and _dismiss_rect(w).has_point(p):
-		w.tag.trader.dismissed.emit()
+	var trd := _trader(w)
+	if trd != null and _dismiss_rect(w).has_point(p):
+		trd.dismissed.emit()
 		return
 	if _title_rect(w).has_point(p):
 		_drag_win = w
 		_drag_off = p - w.pos
 		queue_redraw()
 		return
-	var cell := _cell_in(w, p)
-	if _in_grid(w, cell):
-		var idx := _entry_at(w.tag, cell)
+	var part := _part_at(w, p)
+	if part != null:
+		var cell := _cell_in(w, part, p)
+		var idx := _entry_at(part.tag, cell)
 		if idx >= 0:
-			var e: Dictionary = w.tag.stored[idx]
-			if w.tag.trader != null:
+			var e: Dictionary = part.tag.stored[idx]
+			if trd != null:
 				if not e.get("for_sale", false):
-					w.tag.trader.note = "Not for sale"
+					trd.note = "Not for sale"
 					queue_redraw()
 					return
-				w.tag.trader.note = ""
-			w.tag.stored.remove_at(idx)
+				trd.note = ""
+			part.tag.stored.remove_at(idx)
 			_held = e
-			_held_src = w.tag
+			_held_src = part.tag
 			_held_src_hand = -1
 			_held_src_tile = e["tile"]
 			_held_src_size = e["size"]
@@ -391,18 +453,20 @@ func _on_release(p: Vector2) -> void:
 	var placed := false
 	var w := _win_at(p)
 	if w != null:
-		var cell := _cell_in(w, p)
-		var tile := cell - _held_off
-		var hsize: Vector2i = _held["size"]
-		if _in_grid(w, cell) and _fits(w.tag, tile, hsize):
-			var why := _trade_check(w.tag)
-			if why == "":
-				_trade_commit(w.tag)
-				_held["tile"] = tile
-				w.tag.stored.append(_held)
-				placed = true
-			else:
-				_say(why, w.tag)
+		var part := _part_at(w, p)
+		if part != null:
+			var cell := _cell_in(w, part, p)
+			var tile := cell - _held_off
+			var hsize: Vector2i = _held["size"]
+			if _in_grid(part, cell) and _fits(part.tag, tile, hsize):
+				var why := _trade_check(part.tag)
+				if why == "":
+					_trade_commit(part.tag)
+					_held["tile"] = tile
+					part.tag.stored.append(_held)
+					placed = true
+				else:
+					_say(why, part.tag)
 	elif show_hands and _in_hand_zone(p):
 		var th := _target_hand(p)
 		if th >= 0:
@@ -465,11 +529,11 @@ func _hover_entry(p: Vector2) -> Dictionary:
 		return {}
 	var w := _win_at(p)
 	if w != null:
-		var cell := _cell_in(w, p)
-		if _in_grid(w, cell):
-			var idx := _entry_at(w.tag, cell)
+		var part := _part_at(w, p)
+		if part != null:
+			var idx := _entry_at(part.tag, _cell_in(w, part, p))
 			if idx >= 0:
-				return w.tag.stored[idx]
+				return part.tag.stored[idx]
 		return {}
 	if show_hands:
 		var hi := _hand_at(p)
@@ -587,56 +651,67 @@ func _draw_hands(font: Font) -> void:
 
 func _draw_window(w: Win, font: Font) -> void:
 	var box := _box(w)
-	var gp := _grid_origin(w)
-	var cells := w.tag.inventory_cells()
-	var big := w.tag.inventory_big_cells
-	var sub := float(w.tag.inventory_sub)
 
 	draw_rect(box.grow(3.0), Color(0, 0, 0, 0.35))
 	draw_rect(box, Color(0.1, 0.1, 0.13))
 	draw_rect(Rect2(box.position, Vector2(box.size.x, PAD * 0.5 + TITLE_H)), Color(0.17, 0.17, 0.22))
 	draw_rect(box, Color(0.4, 0.4, 0.5), false, 2.0)
-	draw_string(font, box.position + Vector2(PAD, PAD + 14.0), w.tag.get_display_name(),
+	draw_string(font, box.position + Vector2(PAD, PAD + 14.0), w.title,
 		HORIZONTAL_ALIGNMENT_LEFT, box.size.x - PAD - 40.0, 20, Color.WHITE)
 
 	var cr := _close_rect(w)
 	draw_rect(cr, Color(0.35, 0.15, 0.15))
 	draw_string(font, cr.position + Vector2(6, 17), "X", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
 
-	var trd: CustomerData = w.tag.trader
+	var trd := _trader(w)
 	if trd != null:
 		var dr := _dismiss_rect(w)
 		draw_rect(dr, Color(0.3, 0.2, 0.12))
 		draw_string(font, dr.position + Vector2(0, 16), "Send away",
 			HORIZONTAL_ALIGNMENT_CENTER, dr.size.x, 13, Color.WHITE)
-	if w.tag.has_header():
-		var lines := w.tag.header_lines()
+	if _has_header(w):
+		var lines := _header_lines(w)
 		var colors: Array[Color] = [Color.WHITE, Color(0.95, 0.85, 0.35), Color(1.0, 0.65, 0.45)]
 		var y0 := box.position.y + PAD * 0.5 + TITLE_H + 2.0
 		for i in mini(lines.size(), 3):
 			draw_string(font, Vector2(box.position.x + PAD, y0 + i * 20.0 + 15.0), str(lines[i]),
 				HORIZONTAL_ALIGNMENT_LEFT, box.size.x - PAD * 2.0, 15, colors[i])
 
+	for part in w.parts:
+		_draw_part(w, part, font, trd)
+
+func _draw_part(w: Win, part: Part, font: Font, trd: CustomerData) -> void:
+	var gp := _part_origin(w, part)
+	var tag := part.tag
+	var cells := tag.inventory_cells()
+	var big := tag.inventory_big_cells
+	var sub := float(tag.inventory_sub)
+	var cp := part.cp
+
+	if w.machine != null:
+		draw_string(font, gp + Vector2(0, -5.0), tag.get_display_name(),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.75, 0.78, 0.9))
+
 	for bx in big.x:
 		for by in big.y:
 			var shade := Color(0.15, 0.15, 0.19) if (bx + by) % 2 == 0 else Color(0.18, 0.18, 0.23)
-			draw_rect(Rect2(gp + Vector2(bx, by) * w.cp * sub, Vector2(w.cp, w.cp) * sub), shade)
+			draw_rect(Rect2(gp + Vector2(bx, by) * cp * sub, Vector2(cp, cp) * sub), shade)
 	for x in cells.x:
 		for y in cells.y:
-			draw_rect(Rect2(gp + Vector2(x, y) * w.cp, Vector2(w.cp, w.cp)), Color(0.28, 0.28, 0.34), false, 1.0)
+			draw_rect(Rect2(gp + Vector2(x, y) * cp, Vector2(cp, cp)), Color(0.28, 0.28, 0.34), false, 1.0)
 	for bx in big.x:
 		for by in big.y:
-			draw_rect(Rect2(gp + Vector2(bx, by) * w.cp * sub, Vector2(w.cp, w.cp) * sub), Color(0.6, 0.6, 0.7), false, 2.0)
+			draw_rect(Rect2(gp + Vector2(bx, by) * cp * sub, Vector2(cp, cp) * sub), Color(0.6, 0.6, 0.7), false, 2.0)
 
-	for e in w.tag.stored:
+	for e in tag.stored:
 		var t: Vector2i = e.get("tile", Vector2i.ZERO)
 		var s: Vector2i = e.get("size", Vector2i.ONE)
 		var col: Color = e.get("color", Color.WHITE)
 		var nm: String = e.get("name", "?")
-		var ipos := gp + Vector2(t) * w.cp
-		_draw_item(font, ipos, w.cp, s, col, nm, 1.0)
+		var ipos := gp + Vector2(t) * cp
+		_draw_item(font, ipos, cp, s, col, nm, 1.0)
 		if trd != null:
-			var r := Rect2(ipos, Vector2(s) * w.cp).grow(-2.0)
+			var r := Rect2(ipos, Vector2(s) * cp).grow(-2.0)
 			if e.get("for_sale", false):
 				draw_string(font, Vector2(r.position.x + 3.0, r.end.y - 3.0), "§%d" % int(e.get("ask", 0)),
 					HORIZONTAL_ALIGNMENT_LEFT, maxf(r.size.x - 4.0, 1.0), 12, Color(1, 0.9, 0.3))
@@ -650,16 +725,17 @@ func _draw_held(font: Font) -> void:
 	var nm: String = _held["name"]
 	var w := _win_at(p)
 	if w != null:
-		var cell := _cell_in(w, p)
-		if _in_grid(w, cell):
+		var part := _part_at(w, p)
+		if part != null:
+			var cell := _cell_in(w, part, p)
 			var tile := cell - _held_off
-			var ok := _fits(w.tag, tile, hsize) and _trade_check(w.tag) == ""
+			var ok := _fits(part.tag, tile, hsize) and _trade_check(part.tag) == ""
 			var tint: Color = col if ok else Color(0.9, 0.2, 0.2)
-			_draw_item(font, _grid_origin(w) + Vector2(tile) * w.cp, w.cp, hsize, tint, nm, 0.8)
+			_draw_item(font, _part_origin(w, part) + Vector2(tile) * part.cp, part.cp, hsize, tint, nm, 0.8)
 			return
 	var cp := 28.0
 	if not windows.is_empty():
-		cp = windows[windows.size() - 1].cp
+		cp = windows[windows.size() - 1].parts[0].cp
 	var pos := p - (Vector2(_held_off) + Vector2(0.5, 0.5)) * cp
 	_draw_item(font, pos, cp, hsize, col, nm, 0.8)
 

@@ -1,0 +1,29 @@
+Make the tag system the star
+
+Appraisal: customers don't announce an item's quality or tags. You have to inspect it, with a magnifier or scale you can use, and the tooltip only reveals what you've learned. Buying an "undamaged" item that turns out "damaged" then becomes a real risk.
+Tag-changing machines: a repair bench removes damaged, a cleaner removes rusty, and a workshop turns makeshift into high_quality. Your price multipliers already reward this, so the whole shop becomes buying cheap, fixing, and selling high.
+Crafting: a recipe machine that combines tagged inputs, like cloth + bandage = medical kit. Your printer's RECIPES list is already the start of this.
+
+Make customers memorable
+
+Regulars and relationships: some customers come back, remember how you treated them, and give better prices or rare offers over time.
+Personalities: a haggler who always lowballs, a liar who sells fakes, a desperate seller who accepts anything, a big spender. The pay_factor field is already a hook for this.
+Haggling: instead of a flat offer, a short counter-offer back and forth.
+Thieves: one customer in a few pockets an item, so you have to watch the counter. This is the "stolen" angle.
+
+Make the shop itself a puzzle
+
+Power: your battery idea can grow into a generator. Machines draw power, and a blackout dims the shop or shuts the shutter.
+Space pressure: you already have grid inventories. Add bulky items, heavy items that need two hands, or fragile ones that break if dropped.
+Security: a lock on the door, a camera, a shotgun under the counter. Late-day customers could be dangerous.
+Upgrades: you already planned the printer's upgrade slots, so shelf upgrades (more cells, a locked shelf) and a bigger shop can follow the same pattern.
+
+Give each day a story
+
+Daily events: a storm cuts customers, a rumor makes weapons sell for more, a rival shop undercuts you.
+Demand shifts: the daily wanted tags drift, so food is hot one week and tools the next. That rewards planning your stock overnight, which your new close/start-day flow already supports.
+Notes and orders: a regular asks you to find a specific item by Friday for a big payout.
+
+If I had to pick three, I'd go with appraisal, tag-changing machines, and regulars. They all use systems you've built, and together they give you a loop of buying uncertain stuff, improving it, and selling it to people who know you.
+
+Tell me which one you like and I'll build it.

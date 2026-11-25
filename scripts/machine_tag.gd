@@ -2,8 +2,8 @@ class_name MachineTag
 extends FurnitureTag
 
 # Base for all machines. A machine is a FurnitureTag (so it can be moved in the layout editor)
-# that owns several inventory sections and does something once per day.
-# To make a new machine: extend this, override _build_sections(), accepts() and process_day().
+# that owns several inventory sections, shown together in ONE window, and does something once per day.
+# To make a new machine: extend this, override _build_sections(), accepts(), process_day(), status_lines().
 
 var sections: Array[FurnitureTag] = []
 var status := ""
@@ -36,8 +36,13 @@ func accepts(_slot: String, _item: Dictionary) -> String:
 func process_day() -> void:
 	pass
 
+# Up to 3 lines shown under the window title
+func status_lines() -> Array:
+	return [status]
+
 # ----- helpers -----
-func _add_section(slot_name: String, title: String, big: Vector2i, sub: int) -> FurnitureTag:
+# row: sections with the same row number sit side by side; a higher row goes below
+func _add_section(slot_name: String, title: String, big: Vector2i, sub: int, row := 0) -> FurnitureTag:
 	var s := FurnitureTag.new()
 	s.display_name = title
 	s.inventory_big_cells = big
@@ -45,6 +50,7 @@ func _add_section(slot_name: String, title: String, big: Vector2i, sub: int) -> 
 	s.movable = false
 	s.machine = self
 	s.slot = slot_name
+	s.layout_row = row
 	sections.append(s)
 	return s
 

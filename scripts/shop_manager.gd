@@ -4,7 +4,9 @@ extends Node
 signal shop_opened
 signal shop_closed
 
-enum State { CLOSED, OPENING, OPEN, CLOSING }
+# CLOSED = ready to open, OPEN = customers coming, WAITING_CLOSE = last customer gone, shutter still open,
+# NIGHT = shutter closed, furniture unlocked, waiting for the player to start the next day
+enum State { CLOSED, OPENING, OPEN, WAITING_CLOSE, CLOSING, NIGHT }
 
 @export var shutter: Shutter
 @export var entrance: Marker3D
@@ -35,21 +37,44 @@ func _ready() -> void:
 			or layout_editor == null or customer_menu == null:
 		push_error("ShopManager: missing Shutter, Entrance, CounterSpot, OpenShopTag, ShopEditor or CustomerMenu.")
 		return
-	open_button.prompt = "Open shop"
-	open_button.interacted.connect(open_shop)
+	open_button.interacted.connect(_on_button)
+	_set_state(State.CLOSED)
 
-func open_shop() -> void:
-	if state != State.CLOSED:
-		return
-	state = State.OPENING
-	open_button.enabled = false
+# The button's prompt and availability follow the state
+func _set_state(s: State) -> void:
+	state = s
+	match s:
+		State.CLOSED:
+			open_button.prompt = "Open shop"
+			open_button.enabled = true
+		State.WAITING_CLOSE:
+			open_button.prompt = "Close shop"
+			open_button.enabled = true
+		State.NIGHT:
+			open_button.prompt = "Start next day"
+			open_button.enabled = true
+		_:
+			open_button.enabled = false
+
+func _on_button() -> void:
+	match state:
+		State.CLOSED:
+			await _open_shop()
+		State.WAITING_CLOSE:
+			await _close_shop()
+		State.NIGHT:
+			_start_next_day()
+
+func _open_shop() -> void:
+	_set_state(State.OPENING)
 	layout_editor.locked = true
 	shutter.open()
 	await shutter.finished
-	state = State.OPEN
+	_set_state(State.OPEN)
 	shop_opened.emit()
 	await _run_day()
-	await _close_shop()
+	customer_menu.close_menu()
+	_set_state(State.WAITING_CLOSE)  # shutter stays open until the player closes it
 
 func _run_day() -> void:
 	for i in customers_per_day:
@@ -65,12 +90,13 @@ func _run_day() -> void:
 		await c.finished
 
 func _close_shop() -> void:
-	state = State.CLOSING
-	customer_menu.close_menu()
+	_set_state(State.CLOSING)
 	shutter.close()
 	await shutter.finished
-	GameState.next_day()
-	state = State.CLOSED
-	layout_editor.locked = false
-	open_button.enabled = true
+	layout_editor.locked = false  # furniture can be moved now
+	_set_state(State.NIGHT)
 	shop_closed.emit()
+
+func _start_next_day() -> void:
+	GameState.next_day()  # machines do their daily work here
+	_set_state(State.CLOSED)
