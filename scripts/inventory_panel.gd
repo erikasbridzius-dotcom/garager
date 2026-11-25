@@ -14,9 +14,12 @@ const HAND_ZONE_H := 90.0
 
 # One grid inside a window. A shelf or customer window has one; a machine window has several.
 class Part:
-	var tag: FurnitureTag
-	var off := Vector2.ZERO   # top-left of this grid, relative to the window's grid origin
+	var tag: FurnitureTag = null   # null for the info panel of a machine
+	var is_info := false
+	var row := 0
+	var off := Vector2.ZERO   # top-left of this part, relative to the window's grid origin
 	var cp := 28.0            # pixels per small cell
+	var size := Vector2.ZERO  # info panel only
 
 class Win:
 	var tag: FurnitureTag = null     # shelf / customer window: its container (null for machines)
@@ -123,8 +126,21 @@ func open_machine(m: MachineTag) -> void:
 	for s in m.sections:
 		var part := Part.new()
 		part.tag = s
+		part.row = s.layout_row
 		w.parts.append(part)
-	# use the biggest cell size that still fits the screen
+		if m.info_after != "" and s.slot == m.info_after:
+			var info := Part.new()
+			info.is_info = true
+			info.row = s.layout_row
+			w.parts.append(info)
+	_fit_machine(w)
+	w.pos = (size - _box(w).size) / 2.0 + Vector2(30, 30) * windows.size()
+	_clamp_pos(w)
+	windows.append(w)
+	queue_redraw()
+
+# Use the biggest cell size that still fits the screen
+func _fit_machine(w: Win) -> void:
 	var cp := 22.0
 	while cp > 8.0:
 		_layout_machine(w, cp)
@@ -132,32 +148,37 @@ func open_machine(m: MachineTag) -> void:
 		if b.size.x <= size.x - 16.0 and b.size.y <= size.y - 16.0:
 			break
 		cp -= 1.0
-	w.pos = (size - _box(w).size) / 2.0 + Vector2(30, 30) * windows.size()
-	_clamp_pos(w)
-	windows.append(w)
-	queue_redraw()
 
-# Arranges a machine's sections in rows (sections with the same layout_row sit side by side)
+const INFO_W := 170.0
+const INFO_MIN_H := 150.0
+
+# Arranges a machine's parts in rows (parts with the same row sit side by side)
 func _layout_machine(w: Win, cp: float) -> void:
 	var row_ids: Array[int] = []
 	for part in w.parts:
-		if not row_ids.has(part.tag.layout_row):
-			row_ids.append(part.tag.layout_row)
+		if not row_ids.has(part.row):
+			row_ids.append(part.row)
 	row_ids.sort()
 	var y := 0.0
 	var max_w := 0.0
 	for r in row_ids:
+		var grid_h := 0.0
+		for part in w.parts:
+			if part.row != r or part.is_info:
+				continue
+			part.cp = cp * part.tag.cell_scale
+			part.size = Vector2(part.tag.inventory_cells()) * part.cp
+			grid_h = maxf(grid_h, part.size.y)
 		var x := 0.0
 		var row_h := 0.0
 		for part in w.parts:
-			if part.tag.layout_row != r:
+			if part.row != r:
 				continue
-			var cells := part.tag.inventory_cells()
-			part.cp = cp * (2.0 if cells.x <= 2 else 1.0)  # tiny sections (a battery slot) get bigger cells
+			if part.is_info:
+				part.size = Vector2(INFO_W, maxf(grid_h, INFO_MIN_H))
 			part.off = Vector2(x, y + LABEL_H)
-			var sz := Vector2(cells) * part.cp
-			x += sz.x + PART_GAP
-			row_h = maxf(row_h, sz.y + LABEL_H)
+			x += part.size.x + PART_GAP
+			row_h = maxf(row_h, part.size.y + LABEL_H)
 		max_w = maxf(max_w, x - PART_GAP)
 		y += row_h + PART_GAP
 	w.content = Vector2(max_w, y - PART_GAP)
@@ -205,7 +226,7 @@ func _trader(w: Win) -> CustomerData:
 
 func _has_header(w: Win) -> bool:
 	if w.machine != null:
-		return true
+		return not w.machine.status_lines().is_empty()
 	return w.tag != null and w.tag.has_header()
 
 func _header_lines(w: Win) -> Array:
@@ -277,10 +298,16 @@ func _win_at(p: Vector2) -> Win:
 # Which grid of the window is under p (null if none)
 func _part_at(w: Win, p: Vector2) -> Part:
 	for part in w.parts:
+		if part.is_info:
+			continue
 		var r := Rect2(_part_origin(w, part), Vector2(part.tag.inventory_cells()) * part.cp)
 		if r.has_point(p):
 			return part
 	return null
+
+func _action_rect(w: Win, part: Part) -> Rect2:
+	var o := _part_origin(w, part)
+	return Rect2(o.x, o.y + part.size.y - 28.0, part.size.x, 28.0)
 
 func _bring_to_front(w: Win) -> void:
 	windows.erase(w)
@@ -367,6 +394,11 @@ func _flash(text: String) -> void:
 # ---------- input ----------
 
 func _process(delta: float) -> void:
+		# machine windows follow their sections' size (the workbench grids grow to fit an item)
+	for w in windows:
+		if w.machine != null:
+			_fit_machine(w)
+			_clamp_pos(w)
 	if _toast_t > 0.0:
 		_toast_t -= delta
 		queue_redraw()
@@ -425,6 +457,13 @@ func _on_press(p: Vector2) -> void:
 		_drag_off = p - w.pos
 		queue_redraw()
 		return
+	if w.machine != null and w.machine.action_label() != "":
+		for ip in w.parts:
+			if ip.is_info and _action_rect(w, ip).has_point(p):
+				if w.machine.action_enabled():
+					w.machine.on_action()
+				queue_redraw()
+				return
 	var part := _part_at(w, p)
 	if part != null:
 		var cell := _cell_in(w, part, p)
@@ -678,7 +717,29 @@ func _draw_window(w: Win, font: Font) -> void:
 				HORIZONTAL_ALIGNMENT_LEFT, box.size.x - PAD * 2.0, 15, colors[i])
 
 	for part in w.parts:
-		_draw_part(w, part, font, trd)
+		if part.is_info:
+			_draw_info(w, part, font)
+		else:
+			_draw_part(w, part, font, trd)
+
+func _draw_info(w: Win, part: Part, font: Font) -> void:
+	var o := _part_origin(w, part)
+	var r := Rect2(o, part.size)
+	draw_string(font, o + Vector2(0, -5.0), w.machine.info_title,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.75, 0.78, 0.9))
+	draw_rect(r, Color(0.13, 0.13, 0.17))
+	draw_rect(r, Color(0.35, 0.35, 0.45), false, 1.0)
+	var lines := w.machine.info_lines()
+	for i in lines.size():
+		draw_string(font, o + Vector2(8.0, 20.0 + i * 18.0), str(lines[i][0]),
+		HORIZONTAL_ALIGNMENT_LEFT, part.size.x - 16.0, 14, lines[i][1])
+	if w.machine.action_label() != "":
+		var ar := _action_rect(w, part)
+		var on := w.machine.action_enabled()
+		draw_rect(ar, Color(0.2, 0.5, 0.3) if on else Color(0.25, 0.25, 0.3))
+		draw_rect(ar, Color(0.5, 0.8, 0.6) if on else Color(0.4, 0.4, 0.48), false, 1.5)
+		draw_string(font, ar.position + Vector2(0, 19.0), w.machine.action_label(),
+		HORIZONTAL_ALIGNMENT_CENTER, ar.size.x, 15, Color.WHITE if on else Color(0.6, 0.6, 0.68))
 
 func _draw_part(w: Win, part: Part, font: Font, trd: CustomerData) -> void:
 	var gp := _part_origin(w, part)

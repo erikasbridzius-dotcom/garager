@@ -13,6 +13,7 @@ var trader: CustomerData = null          # set on a customer's inventory, so dro
 var machine: MachineTag = null           # set on a machine's sections
 var slot := ""                           # which section of the machine this is
 var layout_row := 0   # for machine sections: which row of the machine window it sits in
+var cell_scale := 1.0  # machine sections: draw this section's cells bigger (a tiny battery slot, a workbench grid)
 var header_provider: Callable = Callable()  # optional: returns up to 3 text lines shown under the title
 
 var rot_steps := 0

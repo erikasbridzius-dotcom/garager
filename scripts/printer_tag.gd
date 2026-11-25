@@ -15,7 +15,8 @@ func _build_sections() -> void:
 	_add_section("input", "Input", Vector2i(3, 2), 4)
 	_add_section("output", "Output", Vector2i(3, 2), 4)
 	_add_section("upgrades", "Upgrades", Vector2i(2, 2), 4)
-	_add_section("battery", "Battery", Vector2i(1, 1), 2)
+	var bat := _add_section("battery", "Battery", Vector2i(1, 1), 2)
+	bat.cell_scale = 2.0
 
 func accepts(slot_name: String, item: Dictionary) -> String:
 	match slot_name:

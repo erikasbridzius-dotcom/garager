@@ -3,10 +3,13 @@ extends FurnitureTag
 
 # Base for all machines. A machine is a FurnitureTag (so it can be moved in the layout editor)
 # that owns several inventory sections, shown together in ONE window, and does something once per day.
+# Optional: an info panel with a button between sections (see WorkbenchTag).
 # To make a new machine: extend this, override _build_sections(), accepts(), process_day(), status_lines().
 
 var sections: Array[FurnitureTag] = []
 var status := ""
+var info_after := ""        # slot name: show an info panel right after this section ("" = none)
+var info_title := "Info"
 
 func _ready() -> void:
 	super()
@@ -36,9 +39,22 @@ func accepts(_slot: String, _item: Dictionary) -> String:
 func process_day() -> void:
 	pass
 
-# Up to 3 lines shown under the window title
+# Up to 3 lines shown under the window title (return [] for no header)
 func status_lines() -> Array:
 	return [status]
+
+# Info panel: lines are [text, Color]. Keep it to about 5 lines.
+func info_lines() -> Array:
+	return []
+
+func action_label() -> String:   # "" = no button
+	return ""
+
+func action_enabled() -> bool:
+	return false
+
+func on_action() -> void:
+	pass
 
 # ----- helpers -----
 # row: sections with the same row number sit side by side; a higher row goes below
