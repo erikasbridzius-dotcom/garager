@@ -74,8 +74,6 @@ transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, -3.4, 1, 5.6)
 
 [node name="WorkbenchTag" type="Node" parent="Level/Workbench" unique_id=1194193852]
 script = ExtResource("2_763b7")
-footprint = Vector2i(3, 1)
-color = Color(0.9137255, 0.62352943, 0, 1)
 metadata/_custom_type_script = "uid://du6r8s7vu2fm0"
 
 [node name="Printer" parent="Level" unique_id=1862603119 instance=ExtResource("1_e23gp")]

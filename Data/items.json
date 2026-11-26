@@ -1,11 +1,11 @@
 {
-"tag_price_multipliers": {
+  "tag_price_multipliers": {
 	"damaged": 0.5,
 	"rusty": 0.6,
 	"expired": 0.25,
 	"makeshift": 0.8,
 	"high_quality": 1.5
-},
+  },
   "items": [
 	{ "id": "sword", "name": "Makeshift Sword", "size": [1, 4], "color": "#9aa5c8", "price": 45, "tags": ["weapon", "makeshift"] },
 	{ "id": "knife", "name": "Kitchen Knife", "size": [1, 2], "color": "#b8bcc4", "price": 18, "tags": ["weapon", "tool", "undamaged"] },
@@ -20,51 +20,51 @@
 	{ "id": "crate", "name": "Supply Crate", "size": [3, 3], "color": "#8a6b3f", "price": 30, "tags": ["container", "undamaged"] },
 	{ "id": "rusty_knife", "name": "Rusty Knife", "size": [1, 2], "color": "#8a6a4a", "price": 18, "tags": ["weapon", "tool", "rusty"], "restores_to": "knife" },
 	{ "id": "broken_radio", "name": "Broken Radio", "size": [2, 1], "color": "#6a4a4a", "price": 35, "tags": ["electronics", "damaged"], "restores_to": "radio" },
-	
 	{ "id": "laser_cutter", "name": "Industrial Laser Cutter", "size": [2, 3], "color": "#e85d5d", "price": 95, "tags": ["tool", "weapon", "electronics", "undamaged"] },
 	{ "id": "plasma_blade", "name": "Unstable Plasma Blade", "size": [1, 3], "color": "#55d9ff", "price": 145, "tags": ["weapon", "energy", "undamaged"] },
 	{ "id": "pipe_wrench", "name": "Heavy Pipe Wrench", "size": [1, 3], "color": "#858b91", "price": 20, "tags": ["tool", "weapon", "undamaged"] },
-	{ "id": "rusted_crowbar", "name": "Rusted Crowbar", "size": [1, 4], "color": "#795b46", "price": 12, "tags": ["tool", "weapon", "damaged"] },
+	{ "id": "rusted_crowbar", "name": "Rusted Crowbar", "size": [1, 4], "color": "#795b46", "price": 12, "tags": ["tool", "weapon", "damaged"], "restores_to": "crowbar" },
 	{ "id": "shock_glove", "name": "Electrified Work Glove", "size": [1, 2], "color": "#4c9ce0", "price": 75, "tags": ["weapon", "electronics", "undamaged"] },
 	{ "id": "scrap_shield", "name": "Scrap Metal Shield", "size": [2, 3], "color": "#777f88", "price": 42, "tags": ["armor", "makeshift", "undamaged"] },
 	{ "id": "riot_helmet", "name": "Riot Control Helmet", "size": [2, 2], "color": "#485d70", "price": 65, "tags": ["armor", "undamaged"] },
 	{ "id": "kevlar_vest", "name": "Reinforced Street Vest", "size": [2, 3], "color": "#555b4d", "price": 90, "tags": ["armor", "undamaged"] },
-
 	{ "id": "hacking_deck", "name": "Street Hacker Deck", "size": [2, 2], "color": "#47a6a0", "price": 125, "tags": ["electronics", "tool", "undamaged"] },
-	{ "id": "broken_hacking_deck", "name": "Burnt Hacking Deck", "size": [2, 2], "color": "#72545a", "price": 38, "tags": ["electronics", "tool", "damaged"] },
+	{ "id": "broken_hacking_deck", "name": "Burnt Hacking Deck", "size": [2, 2], "color": "#72545a", "price": 38, "tags": ["electronics", "tool", "damaged"], "restores_to": "hacking_deck" },
 	{ "id": "optic_implant", "name": "Cybernetic Eye Implant", "size": [1, 1], "color": "#b95de0", "price": 180, "tags": ["cyberware", "electronics", "medical"] },
 	{ "id": "audio_implant", "name": "Subdermal Audio Implant", "size": [1, 1], "color": "#7b68bd", "price": 110, "tags": ["cyberware", "electronics"] },
 	{ "id": "memory_chip", "name": "Memory Storage Chip", "size": [1, 1], "color": "#56c6b0", "price": 48, "tags": ["electronics", "material"] },
 	{ "id": "holo_mask", "name": "Holographic Disguise Mask", "size": [2, 2], "color": "#bd64db", "price": 155, "tags": ["electronics", "tool"] },
 	{ "id": "wrist_terminal", "name": "Wrist-Mounted Terminal", "size": [1, 2], "color": "#4d88bd", "price": 85, "tags": ["electronics", "tool", "undamaged"] },
 	{ "id": "tracking_beacon", "name": "Personal Tracking Beacon", "size": [1, 1], "color": "#d65b4c", "price": 32, "tags": ["electronics", "tool"] },
-
 	{ "id": "oxygen_tank", "name": "Compact Oxygen Tank", "size": [2, 3], "color": "#5a9bc9", "price": 55, "tags": ["tool", "medical", "undamaged"] },
 	{ "id": "radiation_mask", "name": "Radiation Filter Mask", "size": [2, 2], "color": "#849b65", "price": 48, "tags": ["armor", "medical", "undamaged"] },
 	{ "id": "med_scanner", "name": "Portable Medical Scanner", "size": [2, 2], "color": "#64b9a1", "price": 115, "tags": ["medical", "electronics", "tool"] },
 	{ "id": "surgical_kit", "name": "Field Surgery Kit", "size": [2, 2], "color": "#d2d8d0", "price": 70, "tags": ["medical", "tool"] },
 	{ "id": "painkillers", "name": "Synthetic Painkillers", "size": [1, 1], "color": "#d6c4a5", "price": 16, "tags": ["medical"] },
 	{ "id": "antiseptic_spray", "name": "Antiseptic Nanogel Spray", "size": [1, 2], "color": "#69bfa2", "price": 22, "tags": ["medical"] },
-
 	{ "id": "instant_noodles", "name": "Instant Noodle Brick", "size": [2, 1], "color": "#d99a42", "price": 5, "tags": ["food", "not_expired"] },
 	{ "id": "synthetic_apple", "name": "Lab-Grown Apple", "size": [1, 1], "color": "#c85b53", "price": 9, "tags": ["food", "not_expired"] },
 	{ "id": "nutrient_paste", "name": "Nutrient Paste Tube", "size": [1, 2], "color": "#9b9b56", "price": 4, "tags": ["food", "not_expired"] },
 	{ "id": "energy_gel", "name": "Caffeinated Energy Gel", "size": [1, 1], "color": "#d95cba", "price": 11, "tags": ["food", "medical"] },
 	{ "id": "recycled_water", "name": "Recycled Water Flask", "size": [1, 2], "color": "#4e9fd1", "price": 3, "tags": ["drink"] },
-
 	{ "id": "fiber_optics", "name": "Fiber Optic Cable Coil", "size": [2, 2], "color": "#54b8c9", "price": 26, "tags": ["material", "electronics"] },
 	{ "id": "servo_motor", "name": "Industrial Servo Motor", "size": [2, 2], "color": "#929ba3", "price": 45, "tags": ["material", "electronics", "tool"] },
 	{ "id": "hydraulic_piston", "name": "Hydraulic Piston", "size": [1, 3], "color": "#a0a6a9", "price": 32, "tags": ["material", "mechanical"] },
 	{ "id": "coolant_canister", "name": "Reactor Coolant Canister", "size": [1, 2], "color": "#57b6c7", "price": 19, "tags": ["material", "chemical"] },
 	{ "id": "carbon_plate", "name": "Carbon Composite Plate", "size": [2, 2], "color": "#454c55", "price": 37, "tags": ["material", "armor"] },
-	{ "id": "scrap_circuit", "name": "Damaged Circuit Cluster", "size": [2, 1], "color": "#557d5e", "price": 13, "tags": ["material", "electronics", "damaged"] },
+	{ "id": "scrap_circuit", "name": "Damaged Circuit Cluster", "size": [2, 1], "color": "#557d5e", "price": 13, "tags": ["material", "electronics", "damaged"], "restores_to": "circuit_cluster" },
 	{ "id": "synthetic_leather", "name": "Synthetic Leather Sheet", "size": [2, 2], "color": "#8d594e", "price": 17, "tags": ["material"] },
-
-	{ "id": "robot_dog", "name": "Broken Companion Bot", "size": [2, 3], "color": "#727f91", "price": 95, "tags": ["toy", "robotics", "damaged"] },
+	{ "id": "robot_dog", "name": "Broken Companion Bot", "size": [2, 3], "color": "#727f91", "price": 95, "tags": ["toy", "robotics", "damaged"], "restores_to": "companion_bot" },
 	{ "id": "holo_pet", "name": "Pocket Holographic Pet", "size": [1, 2], "color": "#bd70d9", "price": 65, "tags": ["toy", "electronics"] },
 	{ "id": "windup_drone", "name": "Miniature Wind-Up Drone", "size": [2, 2], "color": "#c7a65a", "price": 28, "tags": ["toy", "electronics"] },
-	{ "id": "neon_sign", "name": "Broken Neon Shop Sign", "size": [3, 2], "color": "#d75cbd", "price": 24, "tags": ["electronics", "decoration", "damaged"] },
+	{ "id": "neon_sign", "name": "Broken Neon Shop Sign", "size": [3, 2], "color": "#d75cbd", "price": 24, "tags": ["electronics", "decoration", "damaged"], "restores_to": "neon_sign_fixed" },
 	{ "id": "music_player", "name": "Vintage Cassette Player", "size": [2, 2], "color": "#b38b5e", "price": 42, "tags": ["electronics", "toy"] },
-	{ "id": "lucky_charm", "name": "Old Plastic Lucky Charm", "size": [1, 1], "color": "#d5a94b", "price": 8, "tags": ["toy", "junk"] }
+	{ "id": "lucky_charm", "name": "Old Plastic Lucky Charm", "size": [1, 1], "color": "#d5a94b", "price": 8, "tags": ["toy", "junk"] },
+
+	{ "id": "radio", "name": "Working Radio", "size": [2, 1], "color": "#4c8c8c", "price": 70, "tags": ["electronics"] },
+	{ "id": "crowbar", "name": "Steel Crowbar", "size": [1, 4], "color": "#858b91", "price": 28, "tags": ["tool", "weapon"] },
+	{ "id": "circuit_cluster", "name": "Working Circuit Cluster", "size": [2, 1], "color": "#65a875", "price": 32, "tags": ["material", "electronics"] },
+	{ "id": "companion_bot", "name": "Working Companion Bot", "size": [2, 3], "color": "#8b9eb5", "price": 180, "tags": ["toy", "robotics"] },
+	{ "id": "neon_sign_fixed", "name": "Working Neon Shop Sign", "size": [3, 2], "color": "#f06bd5", "price": 65, "tags": ["electronics", "decoration"] }
   ]
 }

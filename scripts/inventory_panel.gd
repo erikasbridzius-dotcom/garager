@@ -729,13 +729,13 @@ func _draw_info(w: Win, part: Part, font: Font) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.75, 0.78, 0.9))
 	draw_rect(r, Color(0.13, 0.13, 0.17))
 	draw_rect(r, Color(0.35, 0.35, 0.45), false, 1.0)
-	var lines := w.machine.info_lines()
+	var lines: Array = w.machine.info_lines()
 	for i in lines.size():
 		draw_string(font, o + Vector2(8.0, 20.0 + i * 18.0), str(lines[i][0]),
 		HORIZONTAL_ALIGNMENT_LEFT, part.size.x - 16.0, 14, lines[i][1])
 	if w.machine.action_label() != "":
 		var ar := _action_rect(w, part)
-		var on := w.machine.action_enabled()
+		var on: bool = w.machine.action_enabled()
 		draw_rect(ar, Color(0.2, 0.5, 0.3) if on else Color(0.25, 0.25, 0.3))
 		draw_rect(ar, Color(0.5, 0.8, 0.6) if on else Color(0.4, 0.4, 0.48), false, 1.5)
 		draw_string(font, ar.position + Vector2(0, 19.0), w.machine.action_label(),

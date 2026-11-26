@@ -77,11 +77,17 @@ func _open_shop() -> void:
 	_set_state(State.WAITING_CLOSE)  # shutter stays open until the player closes it
 
 func _run_day() -> void:
+	var queue: Array[CustomerData] = []
+	for o in GameState.orders_due():
+		queue.append(CustomerData.for_order(o))
 	for i in customers_per_day:
+		var d := CustomerData.new()
+		d.roll()
+		queue.append(d)
+	for d in queue:
 		await get_tree().create_timer(arrival_delay).timeout
 		var c := Customer.new()
-		c.data = CustomerData.new()
-		c.data.roll()
+		c.data = d
 		c.entrance_pos = entrance.global_position
 		c.spot_pos = counter_spot.global_position
 		c.clicked.connect(customer_menu.open)

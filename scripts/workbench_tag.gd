@@ -71,8 +71,9 @@ func _result_of(item: Dictionary, fix: Dictionary) -> Dictionary:
 	var res: Dictionary
 	if def.has("restores_to") and str(fix["to"]) == "undamaged":
 		res = ItemDB.make_item(str(def["restores_to"]))
-		if item.has("bought"):
-			res["bought"] = item["bought"]
+		for k in ["bought", "order_uid"]:
+			if item.has(k):
+				res[k] = item[k]
 	else:
 		res = item.duplicate(true)
 		var tags: Array = res["tags"]
