@@ -17,6 +17,7 @@ var kind := "trader"
 var greeting := ""                       # the bubble line when they arrive
 var offer: Dictionary = {}               # the job they propose (offer kinds)
 var order: Dictionary = {}               # the job they come to collect (pickup)
+var resolved_text := ""                  # set once the job is accepted, delivered or cancelled: they only say goodbye
 
 var display_name := "Customer"
 var wants: Array = []                    # tags an item must ALL have to be wanted

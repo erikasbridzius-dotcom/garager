@@ -6,7 +6,7 @@ signal shop_closed
 
 # CLOSED = ready to open, OPEN = customers coming, WAITING_CLOSE = last customer gone, shutter still open,
 # NIGHT = shutter closed, furniture unlocked, waiting for the player to start the next day
-enum State { CLOSED, OPENING, OPEN, WAITING_CLOSE, CLOSING, NIGHT }
+enum State { CLOSED, OPENING, OPEN, WAITING_CLOSE, CLOSING, NIGHT, STARTING }
 
 @export var shutter: Shutter
 @export var entrance: Marker3D
@@ -18,6 +18,7 @@ enum State { CLOSED, OPENING, OPEN, WAITING_CLOSE, CLOSING, NIGHT }
 @export var arrival_delay := 2.0
 
 var state := State.CLOSED
+var day_card: DayCard
 
 func _ready() -> void:
 	var root := get_tree().current_scene
@@ -37,6 +38,8 @@ func _ready() -> void:
 			or layout_editor == null or customer_menu == null:
 		push_error("ShopManager: missing Shutter, Entrance, CounterSpot, OpenShopTag, ShopEditor or CustomerMenu.")
 		return
+	day_card = DayCard.new()
+	add_child(day_card)
 	open_button.interacted.connect(_on_button)
 	_set_state(State.CLOSED)
 
@@ -63,7 +66,7 @@ func _on_button() -> void:
 		State.WAITING_CLOSE:
 			await _close_shop()
 		State.NIGHT:
-			_start_next_day()
+			await _start_next_day()
 
 func _open_shop() -> void:
 	_set_state(State.OPENING)
@@ -104,5 +107,12 @@ func _close_shop() -> void:
 	shop_closed.emit()
 
 func _start_next_day() -> void:
-	GameState.next_day()  # machines do their daily work here
+	_set_state(State.STARTING)
+	GameState.next_day()  # new events are rolled and machines do their daily work
+	var player := get_tree().current_scene.find_child("Player", true, false)
+	if player != null:
+		player.set("busy", true)
+	await day_card.show_day(GameState.day, GameState.today_events)
+	if player != null:
+		player.set("busy", false)
 	_set_state(State.CLOSED)

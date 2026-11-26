@@ -77,7 +77,7 @@ func _on_interacted() -> void:
 	clicked.emit(self)
 
 func _on_business_done() -> void:
-	await get_tree().create_timer(1.2).timeout  # a moment to read the final note
+	await get_tree().create_timer(2.5).timeout  # a moment to read the final line
 	_leave()
 
 func _on_dismissed() -> void:

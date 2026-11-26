@@ -49,9 +49,11 @@ func has_all_tags(entry: Dictionary, wanted: Array) -> bool:
 			return false
 	return true
 
-# Market value: the default price times the multiplier of each tag the item has
+# Market value: the default price times the multiplier of each tag the item has, and today's events
 func value_of(entry: Dictionary) -> int:
 	var v := float(entry.get("price", 0))
-	for t in entry.get("tags", []):
+	var tags: Array = entry.get("tags", [])
+	for t in tags:
 		v *= float(tag_multipliers.get(t, 1.0))
+	v *= GameState.event_multiplier(tags)
 	return maxi(1, roundi(v))

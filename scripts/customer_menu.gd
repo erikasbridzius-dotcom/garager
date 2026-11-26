@@ -124,6 +124,10 @@ func _say(text: String, options: Array) -> void:
 func _show_start() -> void:
 	_stage = "start"
 	var d := _customer.data
+	if d.resolved_text != "":
+		_stage = "done"
+		_say(d.resolved_text, [_opt("Bye", _send_away)])
+		return
 	match d.kind:
 		"print_offer", "restore_offer":
 			_show_offer()
@@ -154,12 +158,16 @@ func _show_offer() -> void:
 
 func _accept_offer() -> void:
 	var d := _customer.data
-	var item: Dictionary = d.offer["give"]
+	if d.resolved_text != "":
+		return
+	var item: Dictionary = (d.offer["give"] as Dictionary).duplicate(true)
 	if not inventory_panel.give_to_free_hand(item):
 		return
 	GameState.add_order(d.make_order())
+	d.resolved_text = d.accepted_text()
 	_stage = "done"
-	_say(d.accepted_text(), [_opt("Bye", _send_away)])
+	_say(d.resolved_text, [_opt("Bye", _send_away)])
+	d.finished_business.emit()  # they head out on their own after a moment
 
 func _show_pickup() -> void:
 	var d := _customer.data
@@ -185,6 +193,8 @@ func _hand_with(o: Dictionary) -> int:
 
 func _hand_over() -> void:
 	var d := _customer.data
+	if d.resolved_text != "":
+		return
 	var i := _hand_with(d.order)
 	if i < 0:
 		return
@@ -192,11 +202,17 @@ func _hand_over() -> void:
 	var reward := int(d.order["reward"])
 	GameState.add_money(reward)
 	GameState.remove_order(d.order)
+	d.resolved_text = "Perfect, thank you! Here's § %d." % reward
 	_stage = "done"
-	_say("Perfect, thank you! Here's § %d." % reward, [_opt("Bye", _send_away)])
+	_say(d.resolved_text, [_opt("Bye", _send_away)])
+	d.finished_business.emit()
 
 func _cancel_order() -> void:
 	var d := _customer.data
+	if d.resolved_text != "":
+		return
 	GameState.remove_order(d.order)
+	d.resolved_text = "Shame. I'll find someone else."
 	_stage = "done"
-	_say("Shame. I'll find someone else.", [_opt("Bye", _send_away)])
+	_say(d.resolved_text, [_opt("Bye", _send_away)])
+	d.finished_business.emit()
