@@ -4,20 +4,24 @@ extends RefCounted
 signal finished_business   # nothing left to buy or sell
 signal dismissed           # the customer should leave now
 
-const NAMES := ["Ada", "Bruno", "Cato", "Dara", "Eli", "Fenna", "Gus", "Hana", "Ivo", "Juno", "Kira", "Lars"]
-const GREETINGS := ["Hey, got a minute?", "Anything good in stock?", "Hello there.", "Quiet day, huh?"]
+const NAMES := ["Zero", "Kira", "Nyx", "Volt", "Jinx", "Rook", "Echo", "Mako", "Sable", "Hex", "Glitch", "Dax"]
+const GREETINGS := ["Hey, got a minute?", "Anything good in stock?", "Hello there.", "Quiet night, huh?"]
 const GRID_BIG := Vector2i(4, 3)  # the customer's inventory size, in big cells
 const GRID_SUB := 4               # small cells per big cell, per side
 const PRINT_DAYS := 3             # days until a print customer comes back
 const RESTORE_DAYS := 2
 const GRACE_DAYS := 2             # days after the due day that an order stays open
+const WHOLESALE_DISCOUNT := 0.15  # off when you buy everything a customer sells
 
 # "trader" = buys/sells, "print_offer" / "restore_offer" = asks for a job, "pickup" = returning for a job
 var kind := "trader"
+var role := ""                           # shown after the name: Thief, Supplier...
 var greeting := ""                       # the bubble line when they arrive
+var intro_text := ""                     # what they say in the dialogue (traders)
+var offers_wholesale := false            # will sell everything in one go, at a discount
 var offer: Dictionary = {}               # the job they propose (offer kinds)
 var order: Dictionary = {}               # the job they come to collect (pickup)
-var resolved_text := ""                  # set once the job is accepted, delivered or cancelled: they only say goodbye
+var resolved_text := ""                  # set once the job/deal is settled: they only say goodbye
 
 var display_name := "Customer"
 var wants: Array = []                    # tags an item must ALL have to be wanted
@@ -33,6 +37,7 @@ var _container: FurnitureTag = null
 static func for_order(o: Dictionary) -> CustomerData:
 	var d := CustomerData.new()
 	d.kind = "pickup"
+	d.role = "Client"
 	d.display_name = str(o["customer"])
 	d.order = o
 	d.greeting = "Hi, it's me again. Is it ready?"
@@ -40,14 +45,22 @@ static func for_order(o: Dictionary) -> CustomerData:
 
 # ---------- dialogue text ----------
 
+func title_text() -> String:
+	if role == "":
+		return display_name
+	return "%s - %s" % [display_name, role]
+
 func dialogue_text() -> String:
 	var parts: Array[String] = []
+	if intro_text != "":
+		parts.append(intro_text)
 	if not wants.is_empty():
-		parts.append("I'm looking for something: %s." % ", ".join(PackedStringArray(wants)))
-	for e in inventory:
-		if e.get("for_sale", false):
-			parts.append("I've got a few things to sell.")
-			break
+		parts.append("Looking for: %s." % ", ".join(PackedStringArray(wants)))
+	if intro_text == "":
+		for e in inventory:
+			if e.get("for_sale", false):
+				parts.append("I've got a few things to sell.")
+				break
 	if parts.is_empty():
 		parts.append("Just browsing.")
 	return " ".join(PackedStringArray(parts))
@@ -79,6 +92,35 @@ func make_order() -> Dictionary:
 	if offer.has("want_uid"):
 		o["want_uid"] = offer["want_uid"]
 	return o
+
+# ---------- wholesale ----------
+
+func wholesale_items() -> Array[Dictionary]:
+	var list: Array[Dictionary] = []
+	for e in inventory:
+		if e.get("for_sale", false):
+			list.append(e)
+	return list
+
+func _wholesale_price(e: Dictionary) -> int:
+	return maxi(1, roundi(float(e.get("ask", 0)) * (1.0 - WHOLESALE_DISCOUNT)))
+
+func wholesale_cost() -> int:
+	var total := 0
+	for e in wholesale_items():
+		total += _wholesale_price(e)
+	return total
+
+# Hands every item for sale over, with its discounted price remembered as the purchase price
+func take_wholesale() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for e in wholesale_items():
+		e["bought"] = _wholesale_price(e)
+		e.erase("ask")
+		e.erase("for_sale")
+		out.append(e)
+		inventory.erase(e)
+	return out
 
 # ---------- the customer's inventory as a shelf-style container ----------
 
@@ -163,19 +205,52 @@ func roll() -> void:
 	display_name = NAMES[randi() % NAMES.size()]
 	pay_factor = randf_range(0.9, 1.4)
 	var r := randf()
-	if r < 0.2:
-		if _roll_print_offer():
-			return
-	elif r < 0.4:
-		if _roll_restore_offer():
-			return
-	_roll_trader()
+	var done := false
+	if r < 0.10:
+		done = _roll_print_offer()
+	elif r < 0.20:
+		done = _roll_restore_offer()
+	elif r < 0.32:
+		done = _roll_thief()
+	elif r < 0.44:
+		done = _roll_supplier()
+	elif r < 0.54:
+		done = _roll_scavenger()
+	elif r < 0.62:
+		done = _roll_collector()
+	elif r < 0.72:
+		done = _roll_netrunner()
+	if not done:
+		_roll_trader()
+
+func _ids_with_tags(any_of: Array) -> Array[String]:
+	var out: Array[String] = []
+	for key in ItemDB.defs:
+		var tags: Array = ItemDB.defs[key].get("tags", [])
+		for t in any_of:
+			if tags.has(t):
+				out.append(str(key))
+				break
+	return out
+
+# Adds one item for sale, priced at value * a random factor between ask_min and ask_max
+func _add_for_sale(id: String, ask_min: float, ask_max: float, extra_tag := "") -> void:
+	var it := ItemDB.make_item(id)
+	if it.is_empty():
+		return
+	if extra_tag != "":
+		it["tags"].append(extra_tag)
+	it["for_sale"] = true
+	it["ask"] = maxi(1, roundi(ItemDB.value_of(it) * randf_range(ask_min, ask_max)))
+	if _auto_place(it):
+		inventory.append(it)
 
 func _roll_print_offer() -> bool:
 	if not (ItemDB.defs.has("filament") and ItemDB.defs.has("plastic_toy")):
 		return false
 	var toy := ItemDB.make_item("plastic_toy")
 	kind = "print_offer"
+	role = "Client"
 	greeting = "Hey! Can you 3D print something for me?"
 	offer = {
 		"kind": "print",
@@ -201,6 +276,7 @@ func _roll_restore_offer() -> bool:
 	give["order_uid"] = uid
 	var target := ItemDB.make_item(str(ItemDB.defs[pick]["restores_to"]))
 	kind = "restore_offer"
+	role = "Client"
 	greeting = "Can you fix something for me?"
 	offer = {
 		"kind": "restore",
@@ -211,6 +287,73 @@ func _roll_restore_offer() -> bool:
 		"reward": roundi(ItemDB.value_of(target) * randf_range(0.6, 0.9)),
 		"days": RESTORE_DAYS,
 	}
+	return true
+
+# Sells stolen goods at a big discount
+func _roll_thief() -> bool:
+	var ids: Array = ItemDB.defs.keys()
+	if ids.is_empty():
+		return false
+	role = "Thief"
+	greeting = "Psst... wanna see something? No questions."
+	intro_text = "Fell off a truck. Don't ask where. Cheap, and no receipts."
+	for i in 2 + randi() % 3:
+		_add_for_sale(str(ids[randi() % ids.size()]), 0.35, 0.6, "stolen")
+	return not inventory.is_empty()
+
+# A big stock of one kind of goods: buy it all and it's cheaper
+func _roll_supplier() -> bool:
+	var themes: Array[String] = []
+	for t in ["food", "drink", "medical", "electronics", "material"]:
+		if not _ids_with_tags([t]).is_empty():
+			themes.append(t)
+	if themes.is_empty():
+		return false
+	var theme := themes[randi() % themes.size()]
+	var ids := _ids_with_tags([theme])
+	role = "Supplier"
+	offers_wholesale = true
+	greeting = "Bulk stock. Good prices."
+	intro_text = "I've got a whole lot of %s. Take the lot and I'll knock %d%% off." % [theme, roundi(WHOLESALE_DISCOUNT * 100.0)]
+	for i in 5 + randi() % 4:
+		_add_for_sale(ids[randi() % ids.size()], 0.9, 1.0)
+	return not inventory.is_empty()
+
+# Cheap damaged goods from the ruins
+func _roll_scavenger() -> bool:
+	var ids := _ids_with_tags(["damaged", "rusty", "expired"])
+	if ids.is_empty():
+		return false
+	role = "Scavenger"
+	greeting = "Found some stuff in the ruins. Wanna look?"
+	intro_text = "Pulled this out of the old district. It's seen better days."
+	for i in 2 + randi() % 3:
+		_add_for_sale(ids[randi() % ids.size()], 0.5, 0.8)
+	return not inventory.is_empty()
+
+# Only buys high quality, pays well
+func _roll_collector() -> bool:
+	role = "Collector"
+	wants = ["high_quality"]
+	pay_factor = randf_range(1.2, 1.6)
+	budget = roundi(randf_range(120.0, 260.0))
+	greeting = "I only buy the finest."
+	intro_text = "I collect quality. Bring me the good stuff."
+	return true
+
+func _roll_netrunner() -> bool:
+	var tags: Array[String] = []
+	for t in ["electronics", "cyberware"]:
+		if not _ids_with_tags([t]).is_empty():
+			tags.append(t)
+	if tags.is_empty():
+		return false
+	role = "Netrunner"
+	wants = [tags[randi() % tags.size()]]
+	pay_factor = randf_range(1.3, 1.8)
+	budget = roundi(randf_range(100.0, 300.0))
+	greeting = "Need hardware. Yesterday."
+	intro_text = "Credits aren't a problem. Hardware is."
 	return true
 
 func _roll_trader() -> void:
@@ -224,6 +367,7 @@ func _roll_trader() -> void:
 		_roll_wants(ids)
 	if mode != 0:
 		_roll_items(ids)
+	offers_wholesale = wholesale_items().size() >= 2 and randf() < 0.3
 
 func _roll_wants(ids: Array) -> void:
 	var ref := ItemDB.make_item(str(ids[randi() % ids.size()]))
@@ -236,7 +380,7 @@ func _roll_wants(ids: Array) -> void:
 	budget = roundi(ItemDB.value_of(ref) * pay_factor * randf_range(1.1, 2.0))
 
 func _roll_items(ids: Array) -> void:
-	for i in 1 + randi() % 5 + 2:
+	for i in 1 + randi() % 3:
 		var it := ItemDB.make_item(str(ids[randi() % ids.size()]))
 		it["for_sale"] = (i == 0) or randf() < 0.6
 		it["ask"] = roundi(ItemDB.value_of(it) * randf_range(0.7, 1.2))

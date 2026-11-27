@@ -107,6 +107,7 @@ func _opt(label: String, cb: Callable, enabled := true) -> Dictionary:
 
 # Shows what the customer says and the buttons to answer
 func _say(text: String, options: Array) -> void:
+	_title.text = _customer.data.title_text()
 	_title.text = _customer.data.display_name
 	_text.text = text
 	for c in _options.get_children():
@@ -134,10 +135,37 @@ func _show_start() -> void:
 		"pickup":
 			_show_pickup()
 		_:
-			_say(d.dialogue_text(), [
-				_opt("Let's trade", _start_trade),
-				_opt("Not today", _send_away),
-			])
+			_show_trader()
+
+func _show_trader() -> void:
+	var d := _customer.data
+	var opts: Array = [_opt("Let's trade", _start_trade)]
+	if d.offers_wholesale and not d.wholesale_items().is_empty():
+		var cost := d.wholesale_cost()
+		var label := "Buy it all: § %d (%d%% off)" % [cost, roundi(CustomerData.WHOLESALE_DISCOUNT * 100.0)]
+		var ok := true
+		if not inventory_panel.can_carry_box():
+			label += " - needs both hands free"
+			ok = false
+		elif GameState.money < cost:
+			label += " - can't afford"
+			ok = false
+		opts.append(_opt(label, _buy_wholesale, ok))
+	opts.append(_opt("Not today", _send_away))
+	_say(d.dialogue_text(), opts)
+
+func _buy_wholesale() -> void:
+	var d := _customer.data
+	var cost := d.wholesale_cost()
+	if d.resolved_text != "" or not inventory_panel.can_carry_box() or GameState.money < cost:
+		return
+	GameState.spend(cost)
+	inventory_panel.carry_box(d.take_wholesale())
+	d.traded = true
+	d.resolved_text = "Pleasure doing business. Mind the box, it's heavy."
+	_stage = "done"
+	_say(d.resolved_text, [_opt("Bye", _send_away)])
+	d.finished_business.emit()
 
 func _start_trade() -> void:
 	_stage = "trading"

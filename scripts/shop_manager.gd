@@ -112,7 +112,8 @@ func _start_next_day() -> void:
 	var player := get_tree().current_scene.find_child("Player", true, false)
 	if player != null:
 		player.set("busy", true)
-	await day_card.show_day(GameState.day, GameState.today_events)
-	if player != null:
-		player.set("busy", false)
+	var notes: Array = []
+	if GameState.rent_paid_today > 0:
+		notes.append({ "title": "Rent paid", "text": "- § %d" % GameState.rent_paid_today, "mult": 1.5 })
+	await day_card.show_day(GameState.day, GameState.today_events + notes)
 	_set_state(State.CLOSED)

@@ -4,7 +4,8 @@
 	"rusty": 0.6,
 	"expired": 0.25,
 	"makeshift": 0.8,
-	"high_quality": 1.5
+	"high_quality": 1.5,
+	"stolen": 0.8
   },
   "items": [
 	{ "id": "sword", "name": "Makeshift Sword", "size": [1, 4], "color": "#9aa5c8", "price": 45, "tags": ["weapon", "makeshift"] },
@@ -65,6 +66,13 @@
 	{ "id": "crowbar", "name": "Steel Crowbar", "size": [1, 4], "color": "#858b91", "price": 28, "tags": ["tool", "weapon"] },
 	{ "id": "circuit_cluster", "name": "Working Circuit Cluster", "size": [2, 1], "color": "#65a875", "price": 32, "tags": ["material", "electronics"] },
 	{ "id": "companion_bot", "name": "Working Companion Bot", "size": [2, 3], "color": "#8b9eb5", "price": 180, "tags": ["toy", "robotics"] },
-	{ "id": "neon_sign_fixed", "name": "Working Neon Shop Sign", "size": [3, 2], "color": "#f06bd5", "price": 65, "tags": ["electronics", "decoration"] }
+	{ "id": "neon_sign_fixed", "name": "Working Neon Shop Sign", "size": [3, 2], "color": "#f06bd5", "price": 65, "tags": ["electronics", "decoration"] },
+	{ "id": "data_chip", "name": "Data Chip", "size": [1, 1], "color": "#4ad8c8", "price": 40, "tags": ["electronics", "undamaged"] },
+	{ "id": "cyber_eye", "name": "Cyber Eye", "size": [1, 1], "color": "#c84a8a", "price": 120, "tags": ["cyberware", "undamaged"] },
+	{ "id": "stim_pack", "name": "Stim Pack", "size": [1, 1], "color": "#d84a4a", "price": 25, "tags": ["medical", "undamaged"] },
+	{ "id": "energy_drink", "name": "Neon Fizz", "size": [1, 2], "color": "#a84ad8", "price": 6, "tags": ["drink", "undamaged"] },
+	{ "id": "scrap_metal", "name": "Scrap Metal", "size": [1, 1], "color": "#7a7a84", "price": 3, "tags": ["material", "undamaged"] },
+	{ "id": "hack_deck", "name": "Hacking Deck", "size": [2, 1], "color": "#3a4a6a", "price": 150, "tags": ["electronics", "undamaged"] },
+	{ "id": "broken_deck", "name": "Fried Deck", "size": [2, 1], "color": "#5a3a4a", "price": 150, "tags": ["electronics", "damaged"], "restores_to": "hack_deck" }
   ]
 }

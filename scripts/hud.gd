@@ -1,7 +1,8 @@
 extends CanvasLayer
 
-var _day_label: Label
-var _money_label: Label
+var _day_label: Button
+var _money_label: Button
+var _info: InfoMenu
 
 func _ready() -> void:
 	layer = 0  # below the fade and layout editor, so those cover it
@@ -23,8 +24,13 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 4)
 	panel.add_child(box)
 
-	_day_label = _make_label(Color.WHITE)
-	_money_label = _make_label(Color(0.95, 0.85, 0.35))
+	_info = InfoMenu.new()
+	add_child(_info)
+
+	_day_label = _make_button(Color.WHITE, "Click for the calendar")
+	_money_label = _make_button(Color(0.95, 0.85, 0.35), "Click for today's finances")
+	_day_label.pressed.connect(_info.toggle_calendar)
+	_money_label.pressed.connect(_info.toggle_ledger)
 	box.add_child(_day_label)
 	box.add_child(_money_label)
 
@@ -33,11 +39,18 @@ func _ready() -> void:
 	_on_day_changed(GameState.day)
 	_on_money_changed(GameState.money)
 
-func _make_label(color: Color) -> Label:
-	var l := Label.new()
-	l.add_theme_font_size_override("font_size", 20)
-	l.add_theme_color_override("font_color", color)
-	return l
+func _make_button(color: Color, tip: String) -> Button:
+	var b := Button.new()
+	b.flat = true
+	b.focus_mode = Control.FOCUS_NONE  # so movement keys never get eaten by the button
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.tooltip_text = tip
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.add_theme_font_size_override("font_size", 20)
+	for key in ["font_color", "font_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(key, color)
+	b.add_theme_color_override("font_hover_color", color.lightened(0.35))
+	return b
 
 func _on_day_changed(d: int) -> void:
 	_day_label.text = "Day %d" % d

@@ -51,6 +51,7 @@ var _held_off := Vector2i.ZERO
 var _tip_on := false
 var _toast := ""
 var _toast_t := 0.0
+var box_tag: FurnitureTag = null   # the wholesale box being carried (null = none)
 
 # ---------- public API ----------
 
@@ -73,6 +74,44 @@ func give_to_free_hand(entry: Dictionary) -> bool:
 			queue_redraw()
 			return true
 	return false
+
+func can_carry_box() -> bool:
+	return box_tag == null and hands[0].is_empty() and hands[1].is_empty()
+
+# Both hands now carry a box holding these items. It can't be dropped or stored.
+func carry_box(items: Array[Dictionary]) -> bool:
+	if not can_carry_box():
+		return false
+	box_tag = FurnitureTag.new()
+	box_tag.display_name = "Wholesale Box"
+	box_tag.inventory_big_cells = CustomerData.GRID_BIG
+	box_tag.inventory_sub = CustomerData.GRID_SUB
+	box_tag.movable = false
+	box_tag.take_only = true
+	box_tag.stored = items
+	hands[0] = {"is_box": true, "name": "Box", "size": Vector2i(2, 2), "color": Color(0.55, 0.4, 0.22),
+		"tags": [], "price": 0, "tile": Vector2i.ZERO}
+	hands[1] = {"ghost": true, "name": "Box", "size": Vector2i(1, 1), "color": Color(0.55, 0.4, 0.22),
+		"tags": [], "price": 0, "tile": Vector2i.ZERO}
+	hand_changed.emit(0, hands[0])
+	hand_changed.emit(1, hands[1])
+	queue_redraw()
+	return true
+
+# When the last item has left the box, the box is gone and the hands are free
+func _check_box() -> void:
+	if box_tag == null or not box_tag.stored.is_empty():
+		return
+	for w in windows.duplicate():
+		if w.tag == box_tag:
+			close_window(w)
+	box_tag.free()
+	box_tag = null
+	hands[0] = {}
+	hands[1] = {}
+	hand_changed.emit(0, hands[0])
+	hand_changed.emit(1, hands[1])
+	queue_redraw()
 
 func blocks_point(p: Vector2) -> bool:
 	if not _held.is_empty() or _drag_win != null or _win_at(p) != null:
@@ -346,6 +385,8 @@ func _fits(tag: FurnitureTag, tile: Vector2i, isize: Vector2i) -> bool:
 
 # Returns "" if putting the held item into dest (null = a hand) is allowed, else the reason why not
 func _trade_check(dest: FurnitureTag) -> String:
+	if dest != null and dest.take_only:
+		return "Can't put things in the box"
 	if dest != null and dest.machine != null:
 		var why := dest.machine.accepts(dest.slot, _held)
 		if why != "":
@@ -437,6 +478,11 @@ func _on_press(p: Vector2) -> void:
 			hands[hi] = {}
 			var hs: Vector2i = _held["size"]
 			_held_src = null
+			var in_hand: Dictionary = hands[hi]
+			if in_hand.get("is_box", false) or in_hand.get("ghost", false):
+				if box_tag != null:
+					open(box_tag)  # the box can't be dragged, only unpacked
+				return
 			_held_src_hand = hi
 			_held_src_tile = Vector2i.ZERO
 			_held_src_size = hs
@@ -521,6 +567,7 @@ func _on_release(p: Vector2) -> void:
 	if not placed:
 		_return_held()
 	_held = {}
+	_check_box()
 	queue_redraw()
 
 func _return_held() -> void:
@@ -577,6 +624,8 @@ func _hover_entry(p: Vector2) -> Dictionary:
 	if show_hands:
 		var hi := _hand_at(p)
 		if hi >= 0:
+			if hands[hi].get("ghost", false):
+				return hands[0]
 			return hands[hi]
 	return {}
 
@@ -584,6 +633,18 @@ func _tooltip_lines(e: Dictionary) -> Array:
 	var grey := Color(0.7, 0.72, 0.8)
 	var gold := Color(1, 0.9, 0.3)
 	var lines: Array = []
+	if e.get("is_box", false):
+		var worth := 0
+		var count := 0
+		if box_tag != null:
+			count = box_tag.stored.size()
+			for it in box_tag.stored:
+				worth += ItemDB.value_of(it)
+		lines.append(["Wholesale Box", Color.WHITE])
+		lines.append(["Contains: %d items" % count, grey])
+		lines.append(["Worth about: § %d" % worth, gold])
+		lines.append(["Click to unpack", gold])
+		return lines
 	lines.append([str(e.get("name", "?")), Color.WHITE])
 	var tags: Array = e.get("tags", [])
 	var cat := str(tags[0]).capitalize() if tags.size() > 0 else "Unknown"
@@ -682,9 +743,15 @@ func _draw_hands(font: Font) -> void:
 			draw_string(font, slot.position + Vector2(0, 50), side,
 				HORIZONTAL_ALIGNMENT_CENTER, slot.size.x, 14, Color(1, 1, 1, 0.5))
 			continue
+		if item.get("ghost", false):
+			draw_string(font, slot.position + Vector2(0, 50), "(carrying box)",
+			HORIZONTAL_ALIGNMENT_CENTER, slot.size.x, 13, Color(1, 1, 1, 0.6))
+			continue
 		var s: Vector2i = item["size"]
 		var col: Color = item["color"]
 		var nm: String = item["name"]
+		if item.get("is_box", false) and box_tag != null:
+			nm = "Box x%d" % box_tag.stored.size()
 		var cp := minf(minf((slot.size.x - 12.0) / s.x, (slot.size.y - 12.0) / s.y), 28.0)
 		_draw_item(font, slot.get_center() - Vector2(s) * cp / 2.0, cp, s, col, nm, 1.0)
 
