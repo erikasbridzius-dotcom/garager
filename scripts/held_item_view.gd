@@ -43,7 +43,7 @@ func _on_hand_changed(index: int, entry: Dictionary) -> void:
 		return
 	var col: Color = entry["color"]
 	var box := BoxMesh.new()
-	if entry.get("is_box", false):
+	if entry.get("two_handed", false):
 		box.size = Vector3(0.4, 0.3, 0.3)          # one big box held between both arms
 		_meshes[0].position.x = -hand_spacing * 0.5
 	else:

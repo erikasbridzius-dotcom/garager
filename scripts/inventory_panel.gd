@@ -11,6 +11,7 @@ const LABEL_H := 18.0    # section label above each part of a machine window
 const PART_GAP := 12.0
 const MIN_W := 110.0
 const HAND_ZONE_H := 90.0
+const WHOLESALE_H := 30.0   # extra height for the "Buy it all" button in a customer's window
 
 # One grid inside a window. A shelf or customer window has one; a machine window has several.
 class Part:
@@ -51,7 +52,6 @@ var _held_off := Vector2i.ZERO
 var _tip_on := false
 var _toast := ""
 var _toast_t := 0.0
-var box_tag: FurnitureTag = null   # the wholesale box being carried (null = none)
 
 # ---------- public API ----------
 
@@ -75,42 +75,132 @@ func give_to_free_hand(entry: Dictionary) -> bool:
 			return true
 	return false
 
+# True when both hands are empty
 func can_carry_box() -> bool:
-	return box_tag == null and hands[0].is_empty() and hands[1].is_empty()
+	return hands[0].is_empty() and hands[1].is_empty()
 
-# Both hands now carry a box holding these items. It can't be dropped or stored.
+# The stand-in that fills the second hand while a two-handed item is carried
+func _ghost() -> Dictionary:
+	return {"ghost": true, "name": "", "size": Vector2i.ONE, "color": Color.WHITE,
+		"tags": [], "price": 0, "tile": Vector2i.ZERO}
+
+# Both hands now carry a wholesale box holding these items
 func carry_box(items: Array[Dictionary]) -> bool:
 	if not can_carry_box():
 		return false
-	box_tag = FurnitureTag.new()
-	box_tag.display_name = "Wholesale Box"
-	box_tag.inventory_big_cells = CustomerData.GRID_BIG
-	box_tag.inventory_sub = CustomerData.GRID_SUB
-	box_tag.movable = false
-	box_tag.take_only = true
-	box_tag.stored = items
-	hands[0] = {"is_box": true, "name": "Box", "size": Vector2i(2, 2), "color": Color(0.55, 0.4, 0.22),
-		"tags": [], "price": 0, "tile": Vector2i.ZERO}
-	hands[1] = {"ghost": true, "name": "Box", "size": Vector2i(1, 1), "color": Color(0.55, 0.4, 0.22),
-		"tags": [], "price": 0, "tile": Vector2i.ZERO}
+	var contents: Array = []
+	for it in items:
+		contents.append(it)
+	hands[0] = {"is_box": true, "two_handed": true, "name": "Wholesale Box", "size": Vector2i(3, 2),
+		"color": Color(0.55, 0.4, 0.22), "tags": [], "price": 0, "tile": Vector2i.ZERO, "contents": contents}
+	hands[1] = _ghost()
 	hand_changed.emit(0, hands[0])
 	hand_changed.emit(1, hands[1])
 	queue_redraw()
 	return true
 
-# When the last item has left the box, the box is gone and the hands are free
-func _check_box() -> void:
-	if box_tag == null or not box_tag.stored.is_empty():
+# Right-click: unpack a box that sits in a shelf
+func _on_right_click(p: Vector2) -> void:
+	var w := _win_at(p)
+	if w != null:
+		var part := _part_at(w, p)
+		if part != null:
+			var idx := _entry_at(part.tag, _cell_in(w, part, p))
+			if idx >= 0 and part.tag.stored[idx].get("is_box", false):
+				_try_unpack(part.tag, idx)
 		return
-	for w in windows.duplicate():
-		if w.tag == box_tag:
-			close_window(w)
-	box_tag.free()
-	box_tag = null
-	hands[0] = {}
-	hands[1] = {}
-	hand_changed.emit(0, hands[0])
-	hand_changed.emit(1, hands[1])
+	if show_hands:
+		var hi := _hand_at(p)
+		if hi >= 0 and hands[hi].get("is_box", false):
+			_flash("Put the box on a shelf, then right-click it to unpack")
+
+func _bigger_first(a: Dictionary, b: Dictionary) -> bool:
+	var sa: Vector2i = a["size"]
+	var sb: Vector2i = b["size"]
+	return sa.x * sa.y > sb.x * sb.y
+
+# Moves everything in the box into the shelf, but only if all of it fits
+func _try_unpack(tag: FurnitureTag, idx: int) -> void:
+	var box: Dictionary = tag.stored[idx]
+	var contents: Array = box.get("contents", [])
+	var cells := tag.inventory_cells()
+	var occupied: Array[Rect2i] = []
+	for i in tag.stored.size():
+		if i == idx:
+			continue   # the box's own space will be free
+		var e: Dictionary = tag.stored[i]
+		occupied.append(Rect2i(e["tile"], e["size"]))
+	var order := contents.duplicate()
+	order.sort_custom(_bigger_first)
+	var spots: Array[Rect2i] = []
+	var missing := 0
+	for it in order:
+		var r := _find_spot(occupied, cells, it["size"])
+		if r.size == Vector2i.ZERO:
+			missing += 1
+		else:
+			occupied.append(r)
+		spots.append(r)
+	if missing > 0:
+		_flash("Not enough room: %d of %d items won't fit" % [missing, order.size()])
+		return
+	tag.stored.remove_at(idx)
+	for i in order.size():
+		var item: Dictionary = order[i]
+		item["tile"] = spots[i].position
+		item["size"] = spots[i].size
+		tag.stored.append(item)
+	_flash("Unpacked %d items" % order.size())
+	queue_redraw()
+
+# First free spot for an item of size s (tries it rotated too). Returns an empty Rect2i if none.
+func _find_spot(occupied: Array[Rect2i], cells: Vector2i, s: Vector2i) -> Rect2i:
+	for rotated in [false, true]:
+		var sz := Vector2i(s.y, s.x) if rotated else s
+		for y in cells.y:
+			for x in cells.x:
+				if x + sz.x > cells.x or y + sz.y > cells.y:
+					continue
+				var r := Rect2i(Vector2i(x, y), sz)
+				var clash := false
+				for o in occupied:
+					if o.intersects(r):
+						clash = true
+						break
+				if not clash:
+					return r
+	return Rect2i()
+
+# ----- wholesale button in a customer's trade window -----
+
+func _wholesale_on(w: Win) -> bool:
+	var t := _trader(w)
+	return t != null and t.offers_wholesale and not t.wholesale_items().is_empty()
+
+func _wholesale_rect(w: Win) -> Rect2:
+	var b := _box(w)
+	var y := b.position.y + PAD * 0.5 + TITLE_H + 2.0 + HEADER_H + 2.0
+	return Rect2(b.position.x + PAD, y, b.size.x - PAD * 2.0, 24.0)
+
+func _wholesale_problem(t: CustomerData) -> String:
+	if not can_carry_box():
+		return "need both hands"
+	if GameState.money < t.wholesale_cost():
+		return "can't afford"
+	return ""
+
+func _buy_wholesale(t: CustomerData) -> void:
+	var why := _wholesale_problem(t)
+	if why != "":
+		t.note = "Can't: " + why
+		queue_redraw()
+		return
+	GameState.spend(t.wholesale_cost())
+	carry_box(t.take_wholesale())
+	t.traded = true
+	t.note = "You bought the whole lot"
+	t.resolved_text = "Pleasure doing business. Mind the box, it's heavy."
+	t.finished_business.emit()
 	queue_redraw()
 
 func blocks_point(p: Vector2) -> bool:
@@ -276,7 +366,10 @@ func _header_lines(w: Win) -> Array:
 	return []
 
 func _header_h(w: Win) -> float:
-	return HEADER_H if _has_header(w) else 0.0
+	var h := HEADER_H if _has_header(w) else 0.0
+	if _wholesale_on(w):
+		h += WHOLESALE_H
+	return h
 
 func _box(w: Win) -> Rect2:
 	var width := maxf(w.content.x + PAD * 2.0, MIN_W)
@@ -304,7 +397,12 @@ func _hand_slot_rect(i: int) -> Rect2:
 	var x := 30.0 if i == 0 else size.x - 30.0 - 90.0
 	return Rect2(x, size.y - 100.0, 90.0, 90.0)
 
+func _middle_slot_rect() -> Rect2:
+	return Rect2((size.x - 130.0) / 2.0, size.y - 100.0, 130.0, 90.0)
+
 func _hand_at(p: Vector2) -> int:
+	if hands[0].get("two_handed", false):
+		return 0 if _middle_slot_rect().has_point(p) else -1
 	for i in 2:
 		if not hands[i].is_empty() and _hand_slot_rect(i).has_point(p):
 			return i
@@ -385,8 +483,8 @@ func _fits(tag: FurnitureTag, tile: Vector2i, isize: Vector2i) -> bool:
 
 # Returns "" if putting the held item into dest (null = a hand) is allowed, else the reason why not
 func _trade_check(dest: FurnitureTag) -> String:
-	if dest != null and dest.take_only:
-		return "Can't put things in the box"
+	if _held.get("is_box", false) and dest != null and (dest.trader != null or dest.machine != null):
+		return "Boxes only go on shelves"
 	if dest != null and dest.machine != null:
 		var why := dest.machine.accepts(dest.slot, _held)
 		if why != "":
@@ -457,10 +555,13 @@ func _gui_input(event: InputEvent) -> void:
 				_on_press(mb.position)
 			else:
 				_on_release(mb.position)
-		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed and not _held.is_empty():
-			_return_held()
-			_held = {}
-			queue_redraw()
+		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
+			if not _held.is_empty():
+				_return_held()
+				_held = {}
+				queue_redraw()
+			else:
+				_on_right_click(mb.position)
 	elif event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion
 		if _drag_win != null:
@@ -474,19 +575,18 @@ func _on_press(p: Vector2) -> void:
 		# No window here: maybe the player is taking an item out of a hand
 		var hi := _hand_at(p) if show_hands else -1
 		if hi >= 0:
-			_held = hands[hi]
-			hands[hi] = {}
-			var hs: Vector2i = _held["size"]
+			var it: Dictionary = hands[hi]
+			var hs: Vector2i = it["size"]
+			_held = it
 			_held_src = null
-			var in_hand: Dictionary = hands[hi]
-			if in_hand.get("is_box", false) or in_hand.get("ghost", false):
-				if box_tag != null:
-					open(box_tag)  # the box can't be dragged, only unpacked
-				return
 			_held_src_hand = hi
 			_held_src_tile = Vector2i.ZERO
 			_held_src_size = hs
 			_held_off = Vector2i(floori(hs.x / 2.0), floori(hs.y / 2.0))
+			hands[hi] = {}
+			if it.get("two_handed", false):
+				hands[1 - hi] = {}   # the stand-in in the other hand
+				hand_changed.emit(1 - hi, hands[1 - hi])
 			hand_changed.emit(hi, hands[hi])
 			queue_redraw()
 		return
@@ -497,6 +597,9 @@ func _on_press(p: Vector2) -> void:
 	var trd := _trader(w)
 	if trd != null and _dismiss_rect(w).has_point(p):
 		trd.dismissed.emit()
+		return
+	if trd != null and _wholesale_on(w) and _wholesale_rect(w).has_point(p):
+		_buy_wholesale(trd)
 		return
 	if _title_rect(w).has_point(p):
 		_drag_win = w
@@ -553,21 +656,36 @@ func _on_release(p: Vector2) -> void:
 				else:
 					_say(why, part.tag)
 	elif show_hands and _in_hand_zone(p):
-		var th := _target_hand(p)
-		if th >= 0:
-			var why2 := _trade_check(null)
-			if why2 == "":
-				_trade_commit(null)
-				_held["tile"] = Vector2i.ZERO
-				hands[th] = _held
-				hand_changed.emit(th, hands[th])
-				placed = true
+		if _held.get("two_handed", false):
+			if can_carry_box():   # both hands are free
+				var why3 := _trade_check(null)
+				if why3 == "":
+					_trade_commit(null)
+					_held["tile"] = Vector2i.ZERO
+					hands[0] = _held
+					hands[1] = _ghost()
+					hand_changed.emit(0, hands[0])
+					hand_changed.emit(1, hands[1])
+					placed = true
+				else:
+					_say(why3, null)
 			else:
-				_say(why2, null)
+				_flash("Needs both hands free")
+		else:
+			var th := _target_hand(p)
+			if th >= 0:
+				var why2 := _trade_check(null)
+				if why2 == "":
+					_trade_commit(null)
+					_held["tile"] = Vector2i.ZERO
+					hands[th] = _held
+					hand_changed.emit(th, hands[th])
+					placed = true
+				else:
+					_say(why2, null)
 	if not placed:
 		_return_held()
 	_held = {}
-	_check_box()
 	queue_redraw()
 
 func _return_held() -> void:
@@ -576,6 +694,9 @@ func _return_held() -> void:
 	if _held_src_hand >= 0:
 		hands[_held_src_hand] = _held
 		hand_changed.emit(_held_src_hand, hands[_held_src_hand])
+		if _held.get("two_handed", false):
+			hands[1] = _ghost()
+			hand_changed.emit(1, hands[1])
 	else:
 		_held_src.stored.append(_held)
 
@@ -634,16 +755,14 @@ func _tooltip_lines(e: Dictionary) -> Array:
 	var gold := Color(1, 0.9, 0.3)
 	var lines: Array = []
 	if e.get("is_box", false):
+		var contents: Array = e.get("contents", [])
 		var worth := 0
-		var count := 0
-		if box_tag != null:
-			count = box_tag.stored.size()
-			for it in box_tag.stored:
-				worth += ItemDB.value_of(it)
+		for it in contents:
+			worth += ItemDB.value_of(it)
 		lines.append(["Wholesale Box", Color.WHITE])
-		lines.append(["Contains: %d items" % count, grey])
+		lines.append(["Contains: %d items" % contents.size(), grey])
 		lines.append(["Worth about: § %d" % worth, gold])
-		lines.append(["Click to unpack", gold])
+		lines.append(["Right-click on a shelf to unpack", gold])
 		return lines
 	lines.append([str(e.get("name", "?")), Color.WHITE])
 	var tags: Array = e.get("tags", [])
@@ -663,6 +782,8 @@ func _tooltip_lines(e: Dictionary) -> Array:
 		lines.append(["Purchased for: —", grey])
 	if e.get("for_sale", false):
 		lines.append(["Asking: § %d" % int(e.get("ask", 0)), gold])
+	if e.get("two_handed", false):
+		lines.append(["Two-handed", grey])
 	lines.append(["Est. value: § %d" % ItemDB.value_of(e), gold])
 	return lines
 
@@ -712,24 +833,63 @@ func _draw() -> void:
 	if _toast_t > 0.0:
 		_draw_toast(font)
 
+func _draw_slot_item(font: Font, slot: Rect2, item: Dictionary) -> void:
+	var s: Vector2i = item["size"]
+	var col: Color = item["color"]
+	var nm: String = item["name"]
+	if item.get("is_box", false):
+		nm = "Box x%d" % (item.get("contents", []) as Array).size()
+	var cp := minf(minf((slot.size.x - 12.0) / s.x, (slot.size.y - 12.0) / s.y), 28.0)
+	_draw_item(font, slot.get_center() - Vector2(s) * cp / 2.0, cp, s, col, nm, 1.0)
+
 func _draw_hands(font: Font) -> void:
 	var holding := not _held.is_empty()
 	if not holding and hands[0].is_empty() and hands[1].is_empty():
 		return
+	var carrying: bool = hands[0].get("two_handed", false)
+	var held_two: bool = holding and _held.get("two_handed", false)
 	var mp := get_local_mouse_position()
-	var target := -1
+	var target := -1   # 0/1 = a hand, 2 = the middle slot
 	if holding:
-		var any_free := hands[0].is_empty() or hands[1].is_empty()
+		var any_free: bool
+		if held_two:
+			any_free = hands[0].is_empty() and hands[1].is_empty()
+		else:
+			any_free = hands[0].is_empty() or hands[1].is_empty()
 		var band := Color(0.2, 0.7, 0.4, 0.28) if any_free else Color(0.8, 0.25, 0.25, 0.28)
 		if _in_hand_zone(mp) and _win_at(mp) == null:
 			band.a = 0.5
-			target = _target_hand(mp)
+			if held_two:
+				target = 2 if any_free else -1
+			else:
+				target = _target_hand(mp)
 		draw_rect(Rect2(0, size.y - HAND_ZONE_H, size.x, HAND_ZONE_H), band)
 		var label := "Drop to hold" if any_free else "Hands full"
-		if any_free and _held_src != null and _held_src.trader != null:
+		if held_two and not any_free:
+			label = "Needs both hands free"
+		elif any_free and _held_src != null and _held_src.trader != null:
 			label = "Buy for § %d" % int(_held.get("ask", 0))
 		draw_string(font, Vector2(0, size.y - HAND_ZONE_H + 18.0), label,
 			HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, Color(1, 1, 1, 0.85))
+	if carrying:
+		var m := _middle_slot_rect()
+		draw_rect(m, Color(0.1, 0.1, 0.13, 0.9))
+		draw_rect(m, Color(0.5, 0.5, 0.6), false, 2.0)
+		_draw_slot_item(font, m, hands[0])
+		for i in 2:
+			var busy := _hand_slot_rect(i)
+			draw_rect(busy, Color(0.08, 0.08, 0.1, 0.7))
+			draw_rect(busy, Color(0.3, 0.3, 0.36), false, 2.0)
+			draw_string(font, busy.position + Vector2(0, 50), "Busy",
+				HORIZONTAL_ALIGNMENT_CENTER, busy.size.x, 14, Color(1, 1, 1, 0.35))
+		return
+	if held_two:
+		var m2 := _middle_slot_rect()
+		draw_rect(m2, Color(0.1, 0.1, 0.13, 0.9))
+		draw_rect(m2, Color(1, 0.9, 0.2) if target == 2 else Color(0.5, 0.5, 0.6), false, 3.0 if target == 2 else 2.0)
+		draw_string(font, m2.position + Vector2(0, 50), "Both hands",
+			HORIZONTAL_ALIGNMENT_CENTER, m2.size.x, 14, Color(1, 1, 1, 0.5))
+		return
 	for i in 2:
 		var item: Dictionary = hands[i]
 		if item.is_empty() and not holding:
@@ -743,17 +903,7 @@ func _draw_hands(font: Font) -> void:
 			draw_string(font, slot.position + Vector2(0, 50), side,
 				HORIZONTAL_ALIGNMENT_CENTER, slot.size.x, 14, Color(1, 1, 1, 0.5))
 			continue
-		if item.get("ghost", false):
-			draw_string(font, slot.position + Vector2(0, 50), "(carrying box)",
-			HORIZONTAL_ALIGNMENT_CENTER, slot.size.x, 13, Color(1, 1, 1, 0.6))
-			continue
-		var s: Vector2i = item["size"]
-		var col: Color = item["color"]
-		var nm: String = item["name"]
-		if item.get("is_box", false) and box_tag != null:
-			nm = "Box x%d" % box_tag.stored.size()
-		var cp := minf(minf((slot.size.x - 12.0) / s.x, (slot.size.y - 12.0) / s.y), 28.0)
-		_draw_item(font, slot.get_center() - Vector2(s) * cp / 2.0, cp, s, col, nm, 1.0)
+		_draw_slot_item(font, slot, item)
 
 func _draw_window(w: Win, font: Font) -> void:
 	var box := _box(w)
@@ -782,7 +932,17 @@ func _draw_window(w: Win, font: Font) -> void:
 		for i in mini(lines.size(), 3):
 			draw_string(font, Vector2(box.position.x + PAD, y0 + i * 20.0 + 15.0), str(lines[i]),
 				HORIZONTAL_ALIGNMENT_LEFT, box.size.x - PAD * 2.0, 15, colors[i])
-
+	if trd != null and _wholesale_on(w):
+		var wr := _wholesale_rect(w)
+		var why := _wholesale_problem(trd)
+		var ok := why == ""
+		draw_rect(wr, Color(0.2, 0.45, 0.3) if ok else Color(0.22, 0.22, 0.27))
+		draw_rect(wr, Color(0.5, 0.8, 0.6) if ok else Color(0.4, 0.4, 0.48), false, 1.5)
+		var wlabel := "Buy all § %d (-%d%%)" % [trd.wholesale_cost(), roundi(CustomerData.WHOLESALE_DISCOUNT * 100.0)]
+		if not ok:
+			wlabel = "Buy all § %d - %s" % [trd.wholesale_cost(), why]
+		draw_string(font, wr.position + Vector2(0, 17.0), wlabel, HORIZONTAL_ALIGNMENT_CENTER,
+			wr.size.x, 13, Color.WHITE if ok else Color(0.65, 0.65, 0.72))
 	for part in w.parts:
 		if part.is_info:
 			_draw_info(w, part, font)

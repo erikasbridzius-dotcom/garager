@@ -116,4 +116,6 @@ func _start_next_day() -> void:
 	if GameState.rent_paid_today > 0:
 		notes.append({ "title": "Rent paid", "text": "- § %d" % GameState.rent_paid_today, "mult": 1.5 })
 	await day_card.show_day(GameState.day, GameState.today_events + notes)
+	if player != null:
+		player.set("busy", false)
 	_set_state(State.CLOSED)

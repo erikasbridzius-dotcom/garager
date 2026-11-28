@@ -18,7 +18,7 @@
 	{ "id": "filament", "name": "Filament Spool", "size": [2, 2], "color": "#4aa8c8", "price": 15, "tags": ["material", "undamaged"] },
 	{ "id": "plastic_toy", "name": "Plastic Toy", "size": [2, 2], "color": "#d84a8a", "price": 10, "tags": ["toy", "undamaged"] },
 	{ "id": "flashlight", "name": "Flashlight", "size": [1, 2], "color": "#c8b848", "price": 14, "tags": ["tool", "electronics", "undamaged"] },
-	{ "id": "crate", "name": "Supply Crate", "size": [3, 3], "color": "#8a6b3f", "price": 30, "tags": ["container", "undamaged"] },
+	{ "id": "crate", "name": "Supply Crate", "size": [2, 2], "color": "#8a6b3f", "price": 30, "tags": ["container", "undamaged"], "two_handed": true },
 	{ "id": "rusty_knife", "name": "Rusty Knife", "size": [1, 2], "color": "#8a6a4a", "price": 18, "tags": ["weapon", "tool", "rusty"], "restores_to": "knife" },
 	{ "id": "broken_radio", "name": "Broken Radio", "size": [2, 1], "color": "#6a4a4a", "price": 35, "tags": ["electronics", "damaged"], "restores_to": "radio" },
 	{ "id": "laser_cutter", "name": "Industrial Laser Cutter", "size": [2, 3], "color": "#e85d5d", "price": 95, "tags": ["tool", "weapon", "electronics", "undamaged"] },

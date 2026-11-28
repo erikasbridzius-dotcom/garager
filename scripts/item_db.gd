@@ -38,6 +38,8 @@ func make_item(id: String) -> Dictionary:
 		"price": int(d.get("price", 0)),
 		"tile": Vector2i.ZERO,
 	}
+	if d.get("two_handed", false):
+		item["two_handed"] = true
 	if d.has("charge"):
 		item["charge"] = int(d["charge"])
 	return item
